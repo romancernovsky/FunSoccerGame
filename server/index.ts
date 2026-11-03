@@ -1,15 +1,9 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname } from "node:path";
-import { timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { Game } from "./game.js";
 const production = process.env.NODE_ENV === "production";
-const pin = process.env.HOST_PIN;
-if (!pin)
-  throw Error(
-    "HOST_PIN must be set. For local use: HOST_PIN=your-pin npm run dev",
-  );
 function numberEnv(name: string, fallback: number, min: number, max: number) {
   const n = Number(process.env[name] ?? fallback);
   if (!Number.isInteger(n) || n < min || n > max)
@@ -101,11 +95,8 @@ type Client = {
   count: number;
   window: number;
   alive: boolean;
-  authCount: number;
-  authWindow: number;
 };
 const clients = new Set<Client>();
-const failures = new Map<string, { count: number; start: number }>();
 const send = (c: Client, type: string, data: unknown) => {
   if (c.ws.readyState === WebSocket.OPEN)
     c.ws.send(JSON.stringify({ type, data }));
@@ -133,7 +124,7 @@ server.on("upgrade", (req, socket, head) => {
   }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
 });
-wss.on("connection", (ws, req) => {
+wss.on("connection", (ws) => {
   const c: Client = {
     ws,
     id: null,
@@ -141,12 +132,9 @@ wss.on("connection", (ws, req) => {
     count: 0,
     window: Date.now(),
     alive: true,
-    authCount: 0,
-    authWindow: 0,
   };
   clients.add(c);
   log("websocket_connected");
-  const ip = req.socket.remoteAddress ?? "unknown";
   send(c, "state", game.snapshot(Date.now()));
   ws.on("pong", () => (c.alive = true));
   ws.on("message", (raw) => {
@@ -190,27 +178,15 @@ wss.on("connection", (ws, req) => {
           send(c, "identity", { id, token: d.token });
           break;
         }
-        case "auth": {
-          let record = failures.get(ip);
-          if (!record || now - record.start > 60000) {
-            record = { count: 0, start: now };
-            failures.set(ip, record);
-          }
-          if (record.count >= 8)
-            throw Error("Too many PIN attempts. Wait one minute.");
-          record.count++;
-          if (typeof d?.pin !== "string" || d.pin.length > 100)
-            throw Error("Invalid host PIN.");
-          const a = Buffer.from(d.pin),
-            b = Buffer.from(pin);
-          if (a.length !== b.length || !timingSafeEqual(a, b))
-            throw Error("Invalid host PIN.");
+        // The event host opens /host directly. This role separates controls from
+        // player inputs; it is intentionally not an authentication boundary.
+        case "host":
           c.host = true;
-          send(c, "authenticated", {});
+          send(c, "host_ready", {});
           break;
-        }
         case "command":
-          if (!c.host) throw Error("Host authorization required.");
+          if (!c.host)
+            throw Error("Open the host console to control the match.");
           if (!d || typeof d.action !== "string")
             throw Error("Invalid command.");
           game.command(d.action, d, now);
@@ -276,9 +252,6 @@ const heartbeat = setInterval(() => {
     c.alive = false;
     c.ws.ping();
   }
-  const now = Date.now();
-  for (const [ip, v] of failures)
-    if (now - v.start > 60000) failures.delete(ip);
 }, 10000);
 server.listen(Number(process.env.PORT ?? 3000), "0.0.0.0", () =>
   log("backend_started", { port: process.env.PORT ?? 3000, dev: !production }),

@@ -8,7 +8,7 @@ Requires Node.js 22 or later.
 
 ```sh
 npm ci
-HOST_PIN=choose-your-pin npm run dev
+npm run dev
 ```
 
 Open `http://localhost:3000` for the spectator lobby, `/join` for players, `/host` for administration and `/screen` for the projector. The root route is a spectator view. Vite is integrated into the Node development service, so one command starts everything. The server listens on all interfaces. Phones on the same network should open `http://YOUR-LAN-IP:3000/join`; open the projector using that same address so its QR code is reachable from phones. Separate browser profiles or private windows simulate different players; tabs in one profile share the temporary player session.
@@ -34,21 +34,20 @@ Enable sound with the button on the projector after an initial browser interacti
 
 ```sh
 npm run build
-NODE_ENV=production HOST_PIN=choose-your-pin PORT=8080 npm start
+NODE_ENV=production PORT=8080 npm start
 ```
 
 ```sh
 docker build -t office-arena .
-docker run --rm -p 8080:8080 -e HOST_PIN=choose-your-pin office-arena
+docker run --rm -p 8080:8080 office-arena
 ```
 
 The production Dockerfile supports both the legacy Docker builder used by Cloud Build and BuildKit. It uses standard `npm ci` without secret mounts or session-specific certificate paths. To check legacy-builder compatibility, run `DOCKER_BUILDKIT=0 docker build -t office-arena .`. After a Dockerfile fix, trigger deployment from the latest `main` commit; retrying an older build keeps its original source commit.
 
-`HOST_PIN` is required; the server refuses to start without it. It is never sent to clients or compiled into the frontend. `.env.example` lists configuration; this project does not automatically load `.env` files.
+The host opens `/host` directly: there is no PIN, login, or required secret. Keep this URL with the meeting organizer; anyone who discovers it can control the match. Player and spectator navigation does not advertise the host route. The host role is a UI/connection distinction, not authentication. `.env.example` lists optional configuration; this project does not automatically load `.env` files.
 
 | Variable                | Default             | Range / purpose                                        |
 | ----------------------- | ------------------- | ------------------------------------------------------ |
-| HOST_PIN                | required            | Host WebSocket authentication                          |
 | PORT                    | 3000 (Docker: 8080) | HTTP and WebSocket port                                |
 | MATCH_DURATION_SECONDS  | 300                 | 1–3600 seconds of active play                          |
 | MAX_TEAM_SIZE           | 6                   | 1–6                                                    |
@@ -62,30 +61,19 @@ Use a GCP project with billing, Cloud Run and Cloud Build enabled. From this dir
 
 ```sh
 gcloud config set project YOUR_PROJECT_ID
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
-# Create a secret without putting the PIN in source or deployment configuration.
-read -r -s -p 'Event host PIN: ' EVENT_HOST_PIN
-printf '%s' "$EVENT_HOST_PIN" | gcloud secrets create office-arena-host-pin --data-file=-
-unset EVENT_HOST_PIN
-```
-
-Grant the runtime service account `roles/secretmanager.secretAccessor` on this secret. Replace the placeholders below with that account, your project number and preferred region. The account needs no other application permissions.
-
-```sh
-gcloud secrets add-iam-policy-binding office-arena-host-pin \
-  --member='serviceAccount:YOUR_RUNTIME_ACCOUNT' \
-  --role='roles/secretmanager.secretAccessor'
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 gcloud run deploy office-arena --source . --region europe-west1 \
-  --service-account YOUR_RUNTIME_ACCOUNT --allow-unauthenticated \
+  --allow-unauthenticated \
   --min-instances 1 --max-instances 1 --concurrency 80 \
   --cpu 1 --memory 512Mi --timeout 3600 --no-cpu-throttling \
-  --set-env-vars NODE_ENV=production \
-  --set-secrets HOST_PIN=office-arena-host-pin:latest
+  --set-env-vars NODE_ENV=production
 ```
+
+For an existing GitHub-connected Cloud Run service, deploy the latest `main` commit. No host PIN or Secret Manager binding is needed. If the service already has a legacy `HOST_PIN` environment/secret reference, it can be removed in **Edit & deploy new revision → Variables & Secrets**. The Docker image listens on `0.0.0.0:8080` by default; Cloud Run's supplied `PORT` is respected.
 
 Cloud Run supplies `PORT` and TLS. Deploy a single revision receiving 100% of traffic; don't split traffic, use parallel revisions, or deploy during an event. Each process has separate memory. Min/max one and always-allocated CPU preserve the narrow single-match architecture, but infrastructure replacement can still lose the match. No persistence is promised. Keep the service running during the event, then reduce minimum instances to avoid ongoing idle cost.
 
-WebSockets use same-origin `/ws`. One-hour request timeout exceeds the typical meeting session; clients reconnect automatically with a 20-second reserved slot. The player token is stored only in that browser's local storage and disappears on New Match/server reset. Refreshing host requires PIN again and does not reset state. Authentication is connection-scoped. Health probe: `/healthz`. Structured JSON events go directly to Cloud Logging. Avoid logging host PINs or session tokens.
+WebSockets use same-origin `/ws`. One-hour request timeout exceeds the typical meeting session; clients reconnect automatically with a 20-second reserved slot. The player token is stored only in that browser's local storage and disappears on New Match/server reset. Opening or refreshing `/host` automatically requests the host role and reconnects to the current match without resetting state. Health probe: `/healthz`. Structured JSON events go directly to Cloud Logging. Avoid logging player session tokens.
 
 Live Cloud Run deployment was not performed in this workspace because no GCP identity or project is configured.
 
@@ -99,15 +87,15 @@ npm run build
 npm run test:browser
 ```
 
-Unit tests cover join/capacity, roles, starts, phases, goals, timing, Golden Goal, reconnection and reset behavior. Network integration tests launch a separate production server and verify host authorization and production bot rejection. Browser tests cover the host/projector lifecycle with realtime test clients, desktop movement and character restoration after refresh, and mobile team choice, orientation and touch controls. Actual WebGL rendering is enabled. Tests do not prove real iOS Safari/Android Chrome or corporate Wi-Fi reliability; those require a physical-device rehearsal.
+Unit tests cover join/capacity, roles, starts, phases, goals, timing, Golden Goal, reconnection and reset behavior. Network integration tests launch a separate production server and verify startup without a PIN, explicit host-role selection, connection isolation, and production bot rejection. Browser tests cover the host/projector lifecycle with realtime test clients, desktop movement and character restoration after refresh, and mobile team choice, orientation and touch controls. Actual WebGL rendering is enabled. Tests do not prove real iOS Safari/Android Chrome or corporate Wi-Fi reliability; those require a physical-device rehearsal.
 
-For load testing, run the development server and `npm run test:load`. This connects 20 WebSocket clients, joins 12 players, starts a match with an authenticated host, sends simultaneous inputs and checks synchronized snapshots. Override `LOAD_URL` and `LOAD_HOST_PIN` if needed. Do not run this against a live event lobby.
+For load testing, run the development server and `npm run test:load`. This connects 20 WebSocket clients, joins 12 players, starts a match through a host connection, sends simultaneous inputs and checks synchronized snapshots. Override `LOAD_URL` if needed. Do not run this against a live event lobby.
 
 Before the event, rehearse on the actual Wi-Fi with 12 phones and the projector: join/scan, landscape controls, pass/shoot, audio unlock, briefly toggle one phone's network, and verify reconnect. Corporate networks may isolate phones or block WebSocket upgrades. Touch emulation is not a substitute for this rehearsal.
 
 ## Architecture
 
-`server/game.ts` contains the authoritative simulation and state machine. `server/index.ts` validates WebSocket messages, limits input to 80 messages/second, applies connection-scoped host authorization, rate limits PIN attempts, handles reconnect identity and serves the frontend. Clients never submit position, score, charge duration or match time. Server-calculated charge, input expiry, bounded movement, deterministic goal checks and fixed target ticks own gameplay. Snapshot bandwidth is bounded for the intended 20 connections; slow consumers are disconnected instead of accumulating messages. The browser interpolates snapshots in the 3D view at up to 30 frames per second and captures touch pointers for forgiving controls.
+`server/game.ts` contains the authoritative simulation and state machine. `server/index.ts` validates WebSocket messages, limits input to 80 messages/second, keeps host commands separate from ordinary player inputs, handles reconnect identity and serves the frontend. Clients never submit position, score, charge duration or match time. Server-calculated charge, input expiry, bounded movement, deterministic goal checks and fixed target ticks own gameplay. Snapshot bandwidth is bounded for the intended 20 connections; slow consumers are disconnected instead of accumulating messages. The browser interpolates snapshots in the 3D view at up to 30 frames per second and captures touch pointers for forgiving controls.
 
 No production bots, accounts, rooms, persistent statistics or external data services are included.
 
@@ -123,7 +111,7 @@ The arena uses a real Three.js scene with original modeled stadium architecture,
 
 An independent critic reviewed the 2D iterations and the 3D conversion and scored the previous 2D version 8.3/10 and the final **3D version 8.2/10**. See [VISUAL_REVIEW.md](VISUAL_REVIEW.md) for findings and screenshot provenance. Review screenshots are generated local artifacts in `artifacts/final-screenshots/`; `artifacts/office-arena-screenshots.zip` contains the set. These are excluded from Git; the capture helpers can reproduce them. Screenshot capture helpers in `scripts/capture-*.mjs` are for an isolated development server only: they reset its lobby and create test players.
 
-The 3D browser view requires WebGL 2. If unavailable, the application displays a clear graphics message. On graphics-context loss it stops local controls and restores the scene when the browser restores WebGL. A temporary host connection loss reauthenticates using the PIN held only in that tab’s memory; refreshing the page still requires PIN entry. Input stalls stop movement and prevent stale automatic shots, while a later explicit release still works.
+The 3D browser view requires WebGL 2. If unavailable, the application displays a clear graphics message. On graphics-context loss it stops local controls and restores the scene when the browser restores WebGL. A temporary host connection loss or refresh automatically restores the host role without a login prompt. Input stalls stop movement and prevent stale automatic shots, while a later explicit release still works.
 
 ## The Reorg surprise
 

@@ -17,15 +17,15 @@ const wait = async (fn, timeout = 15000) => {
 const send = (action, confirm = true) =>
   host.send(JSON.stringify({ type: "command", data: { action, confirm } }));
 await new Promise((r) => host.once("open", r));
-const auth = new Promise((resolve, reject) => {
+const ready = new Promise((resolve, reject) => {
   host.on("message", (r) => {
     const m = JSON.parse(String(r));
-    if (m.type === "authenticated") resolve();
+    if (m.type === "host_ready") resolve();
     if (m.type === "error") console.log(m.data.message);
   });
 });
-host.send(JSON.stringify({ type: "auth", data: { pin: "screenshots-only" } }));
-await auth;
+host.send(JSON.stringify({ type: "host", data: {} }));
+await ready;
 await wait(() => state);
 if (!["WAITING", "FINISHED"].includes(state.phase)) {
   send("end");

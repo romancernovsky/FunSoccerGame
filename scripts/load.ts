@@ -1,7 +1,6 @@
 import { WebSocket } from "ws";
 import assert from "node:assert/strict";
-const url = process.env.LOAD_URL ?? "ws://localhost:3000/ws",
-  pin = process.env.LOAD_HOST_PIN ?? "load-test-pin";
+const url = process.env.LOAD_URL ?? "ws://localhost:3000/ws";
 const clients: WebSocket[] = [],
   states: any[] = [],
   ids: string[] = [];
@@ -48,28 +47,26 @@ try {
     }
   }
   const host = clients[12],
-    auth = waitFor(host, "authenticated");
-  host.send(JSON.stringify({ type: "auth", data: { pin } }));
-  await auth;
+    ready = waitFor(host, "host_ready");
+  host.send(JSON.stringify({ type: "host", data: {} }));
+  await ready;
   host.send(JSON.stringify({ type: "command", data: { action: "start" } }));
   await new Promise((r) => setTimeout(r, 4500));
   interval = setInterval(
     () =>
-      clients
-        .slice(0, 12)
-        .forEach((ws, i) =>
-          ws.send(
-            JSON.stringify({
-              type: "input",
-              data: {
-                x: Math.sin(Date.now() / 800 + i),
-                y: Math.cos(Date.now() / 800 + i),
-                action: Math.sin(Date.now() / 500) > 0,
-                dash: Math.sin(Date.now() / 600) > 0.95,
-              },
-            }),
-          ),
+      clients.slice(0, 12).forEach((ws, i) =>
+        ws.send(
+          JSON.stringify({
+            type: "input",
+            data: {
+              x: Math.sin(Date.now() / 800 + i),
+              y: Math.cos(Date.now() / 800 + i),
+              action: Math.sin(Date.now() / 500) > 0,
+              dash: Math.sin(Date.now() / 600) > 0.95,
+            },
+          }),
         ),
+      ),
     50,
   );
   await new Promise((r) => setTimeout(r, 5000));

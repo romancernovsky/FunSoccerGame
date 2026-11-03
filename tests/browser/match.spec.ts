@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type WebSocketRoute } from "@playwright/test";
 import { WebSocket } from "ws";
 import type { Snapshot } from "../../src/shared";
 class Wire {
@@ -41,8 +41,8 @@ class Wire {
       this.ws.send(JSON.stringify({ type, data }));
     });
   }
-  async auth() {
-    await this.request("auth", { pin: "browser-test-pin" }, "authenticated");
+  async asHost() {
+    await this.request("host", {}, "host_ready");
     return this;
   }
   command(action: string) {
@@ -61,7 +61,7 @@ async function wire() {
   return w;
 }
 test.beforeEach(async () => {
-  const w = await (await wire()).auth();
+  const w = await (await wire()).asHost();
   await expect.poll(() => !!w.state).toBe(true);
   if (!["WAITING", "FINISHED"].includes(w.state!.phase)) {
     w.command("end");
@@ -94,19 +94,21 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
   });
   const host = await ctx.newPage(),
     screen = await ctx.newPage();
+  let hostSocket: WebSocketRoute | undefined;
+  await host.routeWebSocket("**/ws", (socket) => {
+    hostSocket = socket;
+    socket.connectToServer();
+  });
   try {
     await screen.goto("/screen");
     await expect(screen.getByText("Business as unusual.")).toBeVisible();
     await host.goto("/host");
-    await host.locator("#pin").fill("wrong");
-    await host.getByRole("button", { name: /UNLOCK/ }).click();
-    await expect(host.locator("#error")).toContainText("Invalid host PIN");
-    const login = async () => {
-      await host.locator("#pin").fill("browser-test-pin");
-      await host.getByRole("button", { name: /UNLOCK/ }).click();
+    const expectHost = async () => {
       await expect(host.getByText("Run the show.")).toBeVisible();
+      await expect(host.locator('input[type="password"]')).toHaveCount(0);
     };
-    await login();
+    await expectHost();
+    await expect(screen.locator('a[href="/host"]')).toHaveCount(0);
     const click = async (action: string) => {
       await host.bringToFront();
       await host.locator(`[data-command="${action}"]`).click();
@@ -129,6 +131,12 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
     await host.locator("#broadcast-mode").click();
     await expect(host.locator("body")).toHaveClass(/broadcast-view/);
     await expect(host.locator('[data-command="pause"]')).toBeHidden();
+    const previousSocket = hostSocket;
+    await hostSocket!.close({ code: 1012, reason: "Test reconnect" });
+    await expect.poll(() => hostSocket !== previousSocket).toBe(true);
+    await expect(host.locator(".connection")).toContainText("LIVE CONNECTION");
+    await expect(host.locator("body")).toHaveClass(/broadcast-view/);
+
     await host.keyboard.press("Escape");
     await expect(host.locator("body")).not.toHaveClass(/broadcast-view/);
     await click("pause");
@@ -137,7 +145,7 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
     await expect(screen.locator("#arena-overlay")).toContainText("PAUSED");
     await host.bringToFront();
     await host.reload({ waitUntil: "domcontentloaded" });
-    await login();
+    await expectHost();
     await expect.poll(() => control.state?.phase).toBe("PAUSED");
     await expect(host.locator("#arena")).toHaveAttribute(
       "data-renderer",
@@ -171,7 +179,7 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
 test("desktop player: keyboard movement and refresh restore the same 3D character", async ({
   browser,
 }) => {
-  const host = await (await wire()).auth(),
+  const host = await (await wire()).asHost(),
     rival = await wire();
   await rival.request("join", { name: "Sam", team: "WORKERS" }, "identity");
   const ctx = await browser.newContext({
@@ -220,7 +228,7 @@ test("desktop player: keyboard movement and refresh restore the same 3D characte
 test("mobile: team choice, portrait guidance, landscape joystick, action and dash", async ({
   browser,
 }) => {
-  const host = await (await wire()).auth(),
+  const host = await (await wire()).asHost(),
     rival = await wire();
   await rival.request("join", { name: "Alex", team: "LEADERS" }, "identity");
   const ctx = await browser.newContext({

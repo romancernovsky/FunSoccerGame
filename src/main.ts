@@ -30,7 +30,7 @@ const host = route === "/host",
 let state: Snapshot | null = null,
   ws: WebSocket | null = null,
   connected = false,
-  authenticated = false,
+  hostReady = false,
   identity: string | null = null,
   token = localStorage.getItem("lvw-session"),
   selected: Team = "LEADERS",
@@ -39,7 +39,6 @@ let state: Snapshot | null = null,
   notice = "",
   retry = 0,
   replaced = false;
-let hostPinMemory: string | null = null;
 let serverOffset = 0,
   lastEvent = 0,
   audio: AudioContext | null = null,
@@ -83,7 +82,7 @@ function connect() {
     connected = true;
     retry = 0;
     if (token && join) send("reconnect", { token });
-    if (host && hostPinMemory) send("auth", { pin: hostPinMemory });
+    if (host) send("host", {});
     signature = "";
     render();
   };
@@ -113,20 +112,14 @@ function connect() {
         signature = "";
         render();
         break;
-      case "authenticated":
-        authenticated = true;
+      case "host_ready":
+        hostReady = true;
         error = "";
         signature = "";
         render();
         break;
       case "error":
         error = msg.data.message;
-        if (host && /Invalid host PIN|Too many PIN/.test(error)) {
-          hostPinMemory = null;
-          authenticated = false;
-          signature = "";
-          render();
-        }
         const el = document.querySelector("#error");
         if (el) el.textContent = error;
         else {
@@ -152,7 +145,7 @@ function connect() {
   };
   ws.onclose = () => {
     connected = false;
-    if (!hostPinMemory) authenticated = false;
+    // Keep the broadcast visible while the next socket reselects its host role.
     stopInput();
     signature = "";
     render();
@@ -161,7 +154,7 @@ function connect() {
   ws.onerror = () => ws?.close();
 }
 function header() {
-  return `<header><a class="brand" href="/"><span class="brand-icon">✦</span><span>OFFICE<span class="brand-light"> / </span>ARENA<small>LEADERS VS WORKERS</small></span></a><nav><a class="${!host && !join ? "current" : ""}" href="/screen">Spectator</a><a class="${join ? "current" : ""}" href="/join">Join game <span>↗</span></a><a class="${host ? "current" : ""}" href="/host">Host console</a></nav><div class="connection"><i class="${connected ? "" : "offline"}"></i>${connected ? "LIVE CONNECTION" : "RECONNECTING"}</div></header>`;
+  return `<header><a class="brand" href="/"><span class="brand-icon">✦</span><span>OFFICE<span class="brand-light"> / </span>ARENA<small>LEADERS VS WORKERS</small></span></a><nav><a class="${!host && !join ? "current" : ""}" href="/screen">Spectator</a><a class="${join ? "current" : ""}" href="/join">Join game <span>↗</span></a>${host ? '<a class="current" href="/host">Host console</a>' : ""}</nav><div class="connection"><i class="${connected ? "" : "offline"}"></i>${connected ? "LIVE CONNECTION" : "RECONNECTING"}</div></header>`;
 }
 function teamCard(team: Team, manage = false) {
   const ps = state?.players.filter((p) => p.team === team) ?? [];
@@ -195,8 +188,8 @@ function watchToolbar() {
   return `<div class="watch-toolbar"><span class="eyebrow"><i class="live-dot"></i> LIVE BROADCAST</span><div><button class="secondary compact" id="watch-sound">${sound ? "◖ Sound on" : "◖ Enable sound"}</button><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "↙ Exit broadcast" : "⛶ Broadcast mode"}</button></div></div>`;
 }
 function hostPanel() {
-  if (!authenticated)
-    return `<section class="pin-panel"><div class="lock-icon">⌑</div><span class="eyebrow">MATCH CONTROL</span><h1>You're in charge.</h1><p>Enter the host PIN to manage the teams<br>and get the match underway.</p><form id="auth-form"><label for="pin">HOST PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" required placeholder="Enter your PIN"><button class="primary">UNLOCK CONSOLE <span>↗</span></button></form><div id="error" role="alert">${esc(error)}</div><a href="/screen">← Back to spectator screen</a></section>`;
+  if (!hostReady)
+    return `<section class="pin-panel"><span class="eyebrow">MATCH CONTROL</span><h1>Connecting to the control room…</h1><p>Your host console will open automatically.</p><div id="error" role="alert">${esc(error)}</div></section>`;
   return `<div class="section-top host-console-heading"><div><span class="eyebrow">THE CONTROL ROOM</span><h1>Run the show<span class="accent">.</span></h1></div><a class="text-link" href="/screen" target="_blank">Open projector ↗</a></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("LEADERS") !== count("WORKERS") ? "⚠ Teams are uneven. The host decides when to start." : "Ready when you are. The match never starts automatically.") : `${state?.phase.replaceAll("_", " ")} · Official server timer`}</p><div id="error" role="alert">${esc(error)}</div><div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
 }
 function joinPanel() {
@@ -217,11 +210,11 @@ function spectator() {
 }
 function render() {
   if (!state) return;
-  if (!authenticated || !active()) broadcast = false;
+  if (!hostReady || !active()) broadcast = false;
   document.body.classList.toggle("broadcast-view", host && broadcast);
   const sig = JSON.stringify([
     connected,
-    authenticated,
+    hostReady,
     identity,
     state.phase,
     state.players.map((p) => [p.id, p.name, p.team, p.keeper, p.connected]),
@@ -343,11 +336,6 @@ function bind() {
           );
       }),
   );
-  document.querySelector("#auth-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    hostPinMemory = (document.querySelector("#pin") as HTMLInputElement).value;
-    send("auth", { pin: hostPinMemory });
-  });
   document
     .querySelectorAll<HTMLButtonElement>("[data-command]")
     .forEach((b) => (b.onclick = () => confirmCommand(b.dataset.command!)));
@@ -577,7 +565,7 @@ function warmArena() {
     graphicsFailed ||
     !state ||
     state.phase !== "WAITING" ||
-    !((host && authenticated) || (join && identity))
+    !((host && hostReady) || (join && identity))
   )
     return;
   warmingArena = true;
@@ -658,7 +646,7 @@ function draw(time: number) {
   if (!r.width || !r.height) return;
   camera = smoothCamera(
     camera,
-    cameraTarget(state, host && authenticated && followCamera),
+    cameraTarget(state, host && hostReady && followCamera),
     dt,
   );
   world3d.render(state, time, dt, camera, identity, r.width, r.height);
@@ -680,7 +668,7 @@ function draw(time: number) {
     identity,
     join && matchMedia("(pointer:coarse)").matches,
   );
-  if (host && authenticated && followCamera) drawOverview(ctx, camera);
+  if (host && hostReady && followCamera) drawOverview(ctx, camera);
   const overlay = document.querySelector<HTMLElement>("#arena-overlay")!;
   const phase = state.phase;
   let html = "";

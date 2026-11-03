@@ -19,8 +19,7 @@ try {
   const host = await desktop.newPage(),
     player = await mobile.newPage();
   await host.goto(base + "/host");
-  await host.locator("#pin").fill("screenshots-only");
-  await host.getByRole("button", { name: /UNLOCK/ }).click();
+  await host.getByText("Run the show.").waitFor();
   await host.locator("#host-watch").waitFor();
   // Record an actual bot goal if one arrives before starting the controlled two-player demonstration.
   try {

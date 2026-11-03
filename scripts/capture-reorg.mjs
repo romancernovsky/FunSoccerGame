@@ -39,7 +39,7 @@ admin.on("message", (r) => {
   const m = JSON.parse(String(r));
   if (m.type === "state") state = m.data;
 });
-await request(admin, "auth", { pin: "reorg-capture" }, "authenticated");
+await request(admin, "host", {}, "host_ready");
 await wait(() => state);
 const command = (action, id) =>
   admin.send(
@@ -123,8 +123,6 @@ try {
       command("keeper", state.players.find((p) => p.name === names[7]).id);
       if (mode === "broadcast") {
         await page.goto(base + "/host");
-        await page.locator("#pin").fill("reorg-capture");
-        await page.getByRole("button", { name: /UNLOCK/ }).click();
         await page.locator('[data-command="start"]').waitFor();
       }
       command("start");

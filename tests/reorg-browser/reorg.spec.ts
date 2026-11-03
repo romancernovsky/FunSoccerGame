@@ -53,7 +53,7 @@ test("02:00 Reorg changes teams and kits, survives refresh/pause, then kicks off
           : opponent.once("open", r),
       ),
     ]);
-    await request(admin, "auth", { pin: "reorg-test-pin" }, "authenticated");
+    await request(admin, "host", {}, "host_ready");
     await request(
       opponent,
       "join",

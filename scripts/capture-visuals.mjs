@@ -19,10 +19,7 @@ try {
     screen = await desktop.newPage(),
     player = await mobile.newPage();
   await host.goto(base + "/host");
-  await host
-    .locator("#pin")
-    .fill(process.env.CAPTURE_PIN || "screenshots-only");
-  await host.getByRole("button", { name: /UNLOCK/ }).click();
+  await host.getByText("Run the show.").waitFor();
   await host.waitForTimeout(700);
   if (await host.locator('[data-command="end"]').count()) {
     await host.locator('[data-command="end"]').click();
