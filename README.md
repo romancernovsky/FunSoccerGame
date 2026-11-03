@@ -28,6 +28,8 @@ Players enter a unique 1–12 character name and choose a team. The host can mov
 
 The five-minute clock pauses for celebrations, kickoff countdowns and host pauses. Three or more completed passes in the same team possession earn TEAM GOAL recognition. Ties enter unlimited Golden Goal. Host pause/resume, confirmed restart/end, rematch and new match are supported. Rematch keeps players and roles; new match clears them.
 
+During a match, players can select **Full screen** (⛶ on phones) to expand the pitch and controls. Use **Exit full screen** or Escape to leave. Browsers with native fullscreen support hide browser chrome; others, including some iPhone Safari versions, use a viewport-filling layout while browser bars may remain. The layout follows rotation and keeps touch controls inside safe areas.
+
 Enable sound with the button on the projector after an initial browser interaction. Host audio is separately opt-in; leave it off when the projector is the audio source. Phones are silent. All effects are original synthesized tones and filtered noise, including the goal cheer; no third-party sound assets. Display graphics and characters are drawn in code. UI fonts are self-hosted Barlow Condensed and DM Sans (SIL Open Font License), with system fallbacks. The event UI makes no external font requests.
 
 ## Production

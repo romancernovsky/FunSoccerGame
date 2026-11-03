@@ -176,7 +176,7 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
   }
 });
 
-test("desktop player: keyboard movement and refresh restore the same 3D character", async ({
+test("desktop player: fullscreen, keyboard movement and refresh restore the same 3D character", async ({
   browser,
 }) => {
   const host = await (await wire()).asHost(),
@@ -197,6 +197,28 @@ test("desktop player: keyboard movement and refresh restore the same 3D characte
       "data-renderer",
       "webgl",
     );
+    await page.getByRole("button", { name: "Enter full screen" }).click();
+    await expect(page.locator("body")).toHaveClass(/player-fullscreen/);
+    await expect
+      .poll(() => page.evaluate(() => !!document.fullscreenElement))
+      .toBe(true);
+    await expect(page.locator("header")).toBeHidden();
+    expect(
+      await page.evaluate(() => {
+        const r = document.querySelector(".game-main")!.getBoundingClientRect();
+        return {
+          width: r.width,
+          height: r.height,
+          viewportWidth: innerWidth,
+          viewportHeight: innerHeight,
+        };
+      }),
+    ).toMatchObject({
+      width: 960,
+      height: 640,
+      viewportWidth: 960,
+      viewportHeight: 640,
+    });
     const player = host.state!.players.find((p) => p.name === "Alex")!,
       id = player.id,
       x = player.x;
@@ -209,6 +231,22 @@ test("desktop player: keyboard movement and refresh restore the same 3D characte
     await expect
       .poll(() => host.state!.players.find((p) => p.id === id)?.dashReady)
       .toBeGreaterThan(0);
+    await page.getByRole("button", { name: "Exit full screen" }).click();
+    await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
+    await expect
+      .poll(() => page.evaluate(() => !!document.fullscreenElement))
+      .toBe(false);
+    await expect(page.locator("header")).toBeVisible();
+    await page.getByRole("button", { name: "Enter full screen" }).click();
+    await expect
+      .poll(() => page.evaluate(() => !!document.fullscreenElement))
+      .toBe(true);
+    // Exiting from browser chrome must restore the normal game layout too.
+    await page.evaluate(() => document.exitFullscreen());
+    await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
+    await page.getByRole("button", { name: "Enter full screen" }).click();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#arena")).toHaveAttribute(
       "data-renderer",
@@ -225,7 +263,7 @@ test("desktop player: keyboard movement and refresh restore the same 3D characte
   }
 });
 
-test("mobile: team choice, portrait guidance, landscape joystick, action and dash", async ({
+test("mobile: fullscreen fallback, team choice, landscape joystick, action and dash", async ({
   browser,
 }) => {
   const host = await (await wire()).asHost(),
@@ -237,6 +275,15 @@ test("mobile: team choice, portrait guidance, landscape joystick, action and das
       hasTouch: true,
     }),
     page = await ctx.newPage();
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+      value: undefined,
+      configurable: true,
+    });
+    Object.defineProperty(HTMLElement.prototype, "webkitRequestFullscreen", {
+      value: undefined,
+    });
+  });
   try {
     await page.goto("/join");
     await expect(page.locator("#name")).toBeVisible();
@@ -259,6 +306,31 @@ test("mobile: team choice, portrait guidance, landscape joystick, action and das
       "webgl",
     );
     await expect.poll(() => host.state?.phase).toBe("PLAYING");
+    const visible = await page.evaluate(() => ({
+      width: visualViewport!.width,
+      height: visualViewport!.height,
+    }));
+    const fullscreenButton = (await page
+      .locator("#player-fullscreen")
+      .boundingBox())!;
+    expect(fullscreenButton.x + fullscreenButton.width).toBeLessThanOrEqual(
+      visible.width + 1,
+    );
+    await page.getByRole("button", { name: "Enter full screen" }).tap();
+    await expect(page.locator("body")).toHaveClass(/player-fullscreen/);
+    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+    for (const selector of [
+      "#player-fullscreen",
+      "#joystick",
+      "#shoot",
+      "#dash",
+    ]) {
+      const bounds = (await page.locator(selector).boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.y).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(844);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(390);
+    }
     const x = host.state!.players.find((p) => p.name === "Mobile")!.x,
       box = (await page.locator("#joystick").boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -275,6 +347,22 @@ test("mobile: team choice, portrait guidance, landscape joystick, action and das
         () => host.state!.players.find((p) => p.name === "Mobile")!.dashReady,
       )
       .toBeGreaterThan(0);
+    await page.getByRole("button", { name: "Exit full screen" }).tap();
+    await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
+    // A browser that exposes fullscreen but rejects the request stays playable.
+    await page.evaluate(() => {
+      Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+        value: () => Promise.reject(new Error("Fullscreen unavailable")),
+        configurable: true,
+      });
+    });
+    await page.getByRole("button", { name: "Enter full screen" }).tap();
+    await expect(page.locator("body")).toHaveClass(/player-fullscreen/);
+    host.command("end");
+    await expect.poll(() => host.state?.phase).toBe("FINISHED");
+    host.command("new");
+    await expect(page.locator("#name")).toBeVisible();
+    await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
   } finally {
     await ctx.close();
   }

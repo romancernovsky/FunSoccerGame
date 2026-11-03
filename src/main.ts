@@ -182,8 +182,76 @@ function arena() {
 function controls() {
   return `<div class="mobile-identity"><i></i><span>${esc(me()?.name ?? "")}<small>YOU · ${me()?.team ?? ""}</small></span></div><div id="possession-hint" class="possession-hint"></div><div class="mobile-controls"><div id="joystick" class="joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash">↯<small>DASH</small></button><button id="shoot" class="shoot">◉<small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>The whole pitch looks better in landscape.</p></div>`;
 }
+function updateGameViewport() {
+  const viewport = window.visualViewport;
+  const style = document.documentElement.style;
+  style.setProperty(
+    "--game-viewport-width",
+    `${viewport?.width ?? innerWidth}px`,
+  );
+  style.setProperty(
+    "--game-viewport-height",
+    `${viewport?.height ?? innerHeight}px`,
+  );
+  style.setProperty("--game-viewport-left", `${viewport?.offsetLeft ?? 0}px`);
+  style.setProperty("--game-viewport-top", `${viewport?.offsetTop ?? 0}px`);
+}
+window.visualViewport?.addEventListener("resize", updateGameViewport);
+window.visualViewport?.addEventListener("scroll", updateGameViewport);
+window.addEventListener("resize", updateGameViewport);
+updateGameViewport();
+let playerFullscreen = false;
 let broadcast = false;
 let followCamera = true;
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element;
+  webkitExitFullscreen?: () => void | Promise<void>;
+};
+type FullscreenRoot = HTMLElement & {
+  webkitRequestFullscreen?: () => void | Promise<void>;
+};
+const fullscreenElement = () =>
+  document.fullscreenElement ??
+  (document as FullscreenDocument).webkitFullscreenElement;
+function exitBrowserFullscreen() {
+  const doc = document as FullscreenDocument;
+  if (!fullscreenElement()) return;
+  try {
+    void Promise.resolve(
+      (doc.exitFullscreen ?? doc.webkitExitFullscreen)?.call(doc),
+    ).catch(() => {});
+  } catch {
+    // The viewport layout still exits if the browser rejects the API request.
+  }
+}
+function setPlayerFullscreen(enabled: boolean, requestBrowser = true) {
+  stopInput();
+  playerFullscreen = enabled;
+  signature = "";
+  render();
+  if (!requestBrowser) return;
+  if (!enabled) {
+    exitBrowserFullscreen();
+    return;
+  }
+  const root = document.documentElement as FullscreenRoot;
+  if (fullscreenElement()) return;
+  try {
+    // iPhone browsers without element fullscreen still get the viewport layout.
+    void Promise.resolve(
+      (root.requestFullscreen ?? root.webkitRequestFullscreen)?.call(root),
+    )
+      .then(() => {
+        if (!playerFullscreen) exitBrowserFullscreen();
+      })
+      .catch(() => {});
+  } catch {
+    // Keep the playable viewport layout when native fullscreen is unavailable.
+  }
+}
+function playerToolbar() {
+  return `<div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${playerFullscreen ? "Exit" : "Enter"} full screen" aria-pressed="${playerFullscreen}"><b aria-hidden="true">${playerFullscreen ? "↙" : "⛶"}</b><span>${playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
+}
 function watchToolbar() {
   return `<div class="watch-toolbar"><span class="eyebrow"><i class="live-dot"></i> LIVE BROADCAST</span><div><button class="secondary compact" id="watch-sound">${sound ? "◖ Sound on" : "◖ Enable sound"}</button><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "↙ Exit broadcast" : "⛶ Broadcast mode"}</button></div></div>`;
 }
@@ -196,7 +264,7 @@ function joinPanel() {
   const p = me();
   if (p) {
     if (active())
-      return `<div class="player-game">${scoreboard()}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${p.team.toLowerCase()}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
+      return `<div class="player-game">${playerToolbar()}${scoreboard()}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${p.team.toLowerCase()}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
     return `<div class="waiting-layout"><section class="joined-card"><div class="check-mark">✓</div><span class="eyebrow">YOU ARE IN</span><h1>TEAM<br><span class="${p.team === "LEADERS" ? "blue" : "orange"}">${p.team}</span></h1><p>Welcome, <strong>${esc(p.name)}</strong>.<br>Get your game face on.</p><div class="waiting-pill"><i></i>Waiting for host…</div><div class="how-to"><span><b>↔</b>MOVE<small>Joystick / WASD</small></span><span><b>◉</b>PASS<small>Tap</small></span><span><b>↗</b>SHOOT<small>Hold & release</small></span><span><b>ϟ</b>DASH<small>Button / Shift</small></span></div></section>${teamCard(p.team)}</div>`;
   }
   if (active())
@@ -212,6 +280,11 @@ function render() {
   if (!state) return;
   if (!hostReady || !active()) broadcast = false;
   document.body.classList.toggle("broadcast-view", host && broadcast);
+  if (playerFullscreen && !(join && active() && me())) {
+    playerFullscreen = false;
+    exitBrowserFullscreen();
+  }
+  document.body.classList.toggle("player-fullscreen", playerFullscreen);
   const sig = JSON.stringify([
     connected,
     hostReady,
@@ -220,6 +293,7 @@ function render() {
     state.players.map((p) => [p.id, p.name, p.team, p.keeper, p.connected]),
     state.dev,
     broadcast,
+    playerFullscreen,
     followCamera,
   ]);
   if (sig !== signature) {
@@ -296,6 +370,11 @@ function confirmCommand(action: string) {
   dialog.addEventListener("cancel", () => dialog.remove());
 }
 function bind() {
+  document
+    .querySelector("#player-fullscreen")
+    ?.addEventListener("click", () => {
+      setPlayerFullscreen(!playerFullscreen);
+    });
   document
     .querySelector("#watch-sound")
     ?.addEventListener("click", () =>
@@ -595,19 +674,26 @@ let overlayHtml = "";
 let overlayElement: HTMLElement | null = null;
 let camera: Camera = overview();
 window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && playerFullscreen) {
+    setPlayerFullscreen(false);
+  }
   if (e.key === "Escape" && broadcast) {
     broadcast = false;
     signature = "";
     render();
   }
 });
-document.addEventListener("fullscreenchange", () => {
-  if (!document.fullscreenElement && broadcast) {
+function onFullscreenChange() {
+  if (fullscreenElement()) return;
+  if (playerFullscreen) setPlayerFullscreen(false, false);
+  if (broadcast) {
     broadcast = false;
     signature = "";
     render();
   }
-});
+}
+document.addEventListener("fullscreenchange", onFullscreenChange);
+document.addEventListener("webkitfullscreenchange", onFullscreenChange);
 function draw(time: number) {
   requestAnimationFrame(draw);
   if (time - prev < 1000 / 30) return;

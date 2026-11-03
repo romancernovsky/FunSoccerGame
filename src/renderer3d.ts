@@ -650,7 +650,7 @@ export class Arena3D {
     if (this.clock === 0)
       this.ball.position.set(state.ball.x / 100, 0, state.ball.y / 100);
     const aspect = width / Math.max(1, height),
-      half = 4.15;
+      half = 4.15 * Math.max(1, 1.65 / aspect);
     this.camera.left = -half * aspect;
     this.camera.right = half * aspect;
     this.camera.top = half;

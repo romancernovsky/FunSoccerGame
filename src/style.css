@@ -3009,3 +3009,121 @@ body {
     font-size: 12px;
   }
 }
+
+/* Player fullscreen keeps controls in the viewport, including notched phones. */
+.player-game {
+  position: relative;
+}
+.player-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+#player-fullscreen {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  touch-action: manipulation;
+}
+#player-fullscreen b {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+}
+.player-fullscreen {
+  overflow: hidden;
+  background: #071521;
+}
+.player-fullscreen #app > header,
+.player-fullscreen #app > footer,
+.player-fullscreen .player-help {
+  display: none;
+}
+.player-fullscreen .game-main {
+  position: fixed;
+  inset: auto;
+  left: var(--game-viewport-left, 0px);
+  top: var(--game-viewport-top, 0px);
+  z-index: 20;
+  width: var(--game-viewport-width, 100%);
+  height: var(--game-viewport-height, 100dvh);
+  max-width: none;
+  padding: 0;
+  margin: 0;
+}
+.player-fullscreen .player-game {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #071521;
+}
+.player-fullscreen .player-toolbar {
+  position: absolute;
+  top: max(6px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 12;
+  margin: 0;
+}
+.player-fullscreen .scoreboard {
+  flex: none;
+  min-height: 56px;
+  width: 100%;
+  justify-content: center;
+  padding: max(6px, env(safe-area-inset-top)) 160px 6px;
+  border-radius: 0;
+}
+.player-fullscreen .arena-wrap {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-width: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+@media (pointer: coarse) {
+  .game-main {
+    position: fixed;
+    left: var(--game-viewport-left, 0px);
+    top: var(--game-viewport-top, 0px);
+    width: var(--game-viewport-width, 100%);
+    height: var(--game-viewport-height, 100dvh);
+    margin: 0;
+  }
+  .game-main .player-game {
+    height: 100%;
+  }
+  .player-toolbar {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    z-index: 12;
+    margin: 0;
+  }
+  #player-fullscreen {
+    width: 44px;
+    padding: 8px;
+    justify-content: center;
+    background: #0c2332e8;
+    border-color: #8cd9ff55;
+  }
+  #player-fullscreen span {
+    display: none;
+  }
+  .player-fullscreen .player-game {
+    flex-direction: row;
+    align-items: center;
+  }
+  .player-fullscreen .scoreboard {
+    width: max-content;
+    min-height: 44px;
+    padding: 4px 12px;
+    top: env(safe-area-inset-top, 0px);
+    border-radius: 0 0 10px 10px;
+  }
+}
