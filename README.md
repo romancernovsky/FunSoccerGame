@@ -42,6 +42,8 @@ docker build -t office-arena .
 docker run --rm -p 8080:8080 -e HOST_PIN=choose-your-pin office-arena
 ```
 
+The production Dockerfile supports both the legacy Docker builder used by Cloud Build and BuildKit. It uses standard `npm ci` without secret mounts or session-specific certificate paths. To check legacy-builder compatibility, run `DOCKER_BUILDKIT=0 docker build -t office-arena .`. After a Dockerfile fix, trigger deployment from the latest `main` commit; retrying an older build keeps its original source commit.
+
 `HOST_PIN` is required; the server refuses to start without it. It is never sent to clients or compiled into the frontend. `.env.example` lists configuration; this project does not automatically load `.env` files.
 
 | Variable                | Default             | Range / purpose                                        |
