@@ -109,6 +109,21 @@ test(
           .message,
         /disabled in production/,
       );
+      const manifestResponse = await fetch(
+        "http://127.0.0.1:3102/manifest.webmanifest",
+      );
+      assert.match(
+        manifestResponse.headers.get("content-type")!,
+        /application\/manifest\+json/,
+      );
+      const manifest = (await manifestResponse.json()) as any;
+      assert.equal(manifest.display, "standalone");
+      assert.equal(manifest.start_url, "/join");
+      for (const icon of manifest.icons) {
+        const image = await fetch("http://127.0.0.1:3102" + icon.src);
+        assert.equal(image.status, 200);
+        assert.match(image.headers.get("content-type")!, /image\/png/);
+      }
       const audience = await fetch("http://127.0.0.1:3102/api/audience");
       assert.equal(audience.headers.get("cache-control"), "no-store");
       assert.match(audience.headers.get("set-cookie")!, /HttpOnly/);

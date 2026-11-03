@@ -1,0 +1,15 @@
+{
+  "id": "/join",
+  "name": "Office Arena — Leaders vs Workers",
+  "short_name": "Office Arena",
+  "start_url": "/join",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#071b27",
+  "theme_color": "#071b27",
+  "icons": [
+    { "src": "/icons/arena-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/arena-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

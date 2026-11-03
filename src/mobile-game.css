@@ -12,7 +12,7 @@
 
 @media (pointer: coarse) and (orientation: landscape) {
   .game-main .player-game {
-    --control-gutter: 96px;
+    --control-gutter: 0px;
     display: grid;
     grid-template-columns:
       calc(var(--control-gutter) + env(safe-area-inset-left, 0px))
@@ -220,7 +220,7 @@
 }
 @media (pointer: coarse) and (orientation: landscape) and (max-width: 800px) {
   .game-main .player-game {
-    --control-gutter: 88px;
+    --control-gutter: 0px;
   }
   .game-main .joystick {
     left: calc(2px + env(safe-area-inset-left, 0px));
@@ -294,5 +294,192 @@
     font-size: 8px;
     padding: 5px 9px;
     letter-spacing: 0.5px;
+  }
+}
+
+.player-view-tools {
+  display: none;
+}
+#display-help {
+  max-width: 470px;
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+#display-help p,
+#display-help li {
+  font-size: 13px;
+  line-height: 1.6;
+}
+#display-help ol {
+  padding-left: 22px;
+}
+#display-help .display-help-note {
+  color: #e5bf8e;
+  margin: 15px 0;
+}
+#display-help button {
+  width: 100%;
+  margin-top: 14px;
+}
+@media (pointer: coarse) and (orientation: landscape) {
+  .game-main .player-view-tools {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    position: absolute;
+    left: calc(4px + env(safe-area-inset-left, 0px));
+    top: max(2px, env(safe-area-inset-top));
+    z-index: 6;
+  }
+  .game-main #player-camera {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    min-height: 44px;
+    padding: 2px;
+    border: 0;
+    background: #0b243566;
+    color: #c9e4ee;
+  }
+  #player-camera svg {
+    width: 20px;
+    height: 20px;
+  }
+  #player-camera span {
+    font-size: 7px;
+    letter-spacing: 0.6px;
+  }
+  .attack-direction {
+    color: #94d6ff;
+    font-size: 8px;
+    font-weight: 700;
+    margin-top: 7px;
+    white-space: nowrap;
+  }
+  .attack-direction.workers {
+    color: #ffc28d;
+  }
+}
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 300px) {
+  .game-main .action-controls {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .game-main .action-controls .dash {
+    margin-bottom: 2px;
+  }
+  .game-main .joystick {
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
+.ios-launch-tip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #aed6e52b;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 0 0 18px;
+  color: #b9d2de;
+  background: #0b243588;
+}
+.ios-launch-tip p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ios-launch-tip strong {
+  color: #e1f5c4;
+}
+.ios-launch-tip button {
+  flex: none;
+  min-height: 44px;
+}
+@media (max-width: 600px) {
+  .ios-launch-tip {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+#display-help .display-help-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 44px;
+  margin-bottom: 12px;
+  background: #203025;
+}
+#display-help .display-help-toolbar button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px;
+  background: #31483b;
+  border: 1px solid #a8cc9b44;
+  border-radius: 6px;
+  color: #f2ffe8;
+}
+#display-help .display-help-toolbar svg {
+  width: 22px;
+  height: 22px;
+}
+@media (max-height: 320px) {
+  #display-help {
+    padding: 12px 20px;
+  }
+  #display-help h2 {
+    font-size: 25px;
+  }
+}
+/* Controls need contrast now that the closer camera puts turf beneath them. */
+@media (pointer: coarse) and (orientation: landscape) {
+  .game-main .joystick {
+    background: #071b2780;
+    border-color: #bddbe886;
+  }
+  .game-main .joystick > span {
+    background: #bddbe84a;
+    border-color: #e3f5ffad;
+  }
+  .game-main .action-controls .shoot {
+    background: #071b27c2;
+    border-color: #cbe6a5ad;
+    color: #f0ffe1;
+  }
+  .game-main .action-controls .shoot.has-ball {
+    background: #153a2ce8;
+    border-color: #dcff9a;
+  }
+  .game-main .action-controls .dash {
+    background: #071b27c2;
+    border-color: #b7d5e59c;
+    color: #edf7ff;
+  }
+  .game-main .action-controls .dash small {
+    font-size: 9px;
+  }
+  .game-main .action-controls .dash.on-cooldown {
+    border-color: #7896a5;
+  }
+  .game-main .action-controls .dash.on-cooldown svg {
+    opacity: 0.5;
+  }
+  .game-main .action-controls .dash.on-cooldown small {
+    color: #f0f8ff;
+    font-size: 10px;
   }
 }

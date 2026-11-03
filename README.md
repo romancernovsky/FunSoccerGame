@@ -28,7 +28,11 @@ Players enter a unique 1–12 character name and choose a team. The host can mov
 
 The five-minute clock pauses for celebrations, kickoff countdowns and host pauses. Three or more completed passes in the same team possession earn TEAM GOAL recognition. Ties enter unlimited Golden Goal. Host pause/resume, confirmed restart/end, rematch and new match are supported. Rematch keeps players and roles; new match clears them.
 
-During a match, players can select **Full screen** (⛶ on phones) to expand the pitch and controls. Use **Exit full screen** or Escape to leave. Browsers with native fullscreen support hide browser chrome; others, including some iPhone Safari versions, use a viewport-filling layout while browser bars may remain. The layout follows rotation and keeps touch controls inside safe areas.
+Phones use a closer player camera by default. **FIELD** shows the full arena; **PLAYER** returns to your character. A high-contrast ball marker keeps the ball readable at small screen sizes; a **BALL** arrow points toward it when it is outside the view or under a control. Camera orientation stays fixed, and the attack-direction cue follows your current team.
+
+Native **Full screen** is available only where the browser supports it. Unsupported/rejected requests open screen options instead of claiming success. On iPhone Safari, the guide explains **Share → Add to Home Screen → Add**, then launching **Office Arena** from its icon before joining. Safari's address/tab bars cannot be hidden programmatically from an ordinary tab. The ordinary tab remains playable with the smaller visible viewport. The optional Home Screen app uses a standalone manifest and Apple web-app metadata; it requires no App Store download and has no offline game cache.
+
+Set up the Home Screen app **before joining**: Safari and standalone storage/session continuity is not guaranteed. If you already joined, stay in that tab for the current match. The guide has an always-visible close control and does not permit movement/shot keyboard input behind it.
 
 Enable sound with the button on the projector after an initial browser interaction. Host audio is separately opt-in; leave it off when the projector is the audio source. Phones are silent. All effects are original synthesized tones and filtered noise, including the goal cheer; no third-party sound assets. Display graphics and characters are drawn in code. UI fonts are self-hosted Barlow Condensed and DM Sans (SIL Open Font License), with system fallbacks. The event UI makes no external font requests.
 
@@ -103,7 +107,7 @@ No production bots, accounts, rooms, persistent statistics or external data serv
 
 ## Host live broadcast
 
-After START MATCH, `/host` automatically displays the live arena, synchronized countdown, score, clock and celebrations above the match controls. The default ball-follow camera gently pans toward play and adjusts zoom for ball speed and nearby players. A full-field minimap shows every player while zoomed in. Countdown, pause, goal and final screens return to the overview. Player and `/screen` cameras remain full-field.
+After START MATCH, `/host` automatically displays the live arena, synchronized countdown, score, clock and celebrations above the match controls. The default ball-follow camera gently pans toward play and adjusts zoom for ball speed and nearby players. A full-field minimap shows every player while zoomed in. Countdown, pause, goal and final screens return to the overview. Phone players use a closer player camera with a FIELD overview toggle; `/screen` remains full-field.
 
 Use **Full field / Ball-follow camera** to switch framing. **Broadcast mode** hides administration, rosters and navigation, fits the arena to the window and requests browser fullscreen. Share this host browser tab or window in the meeting. Move the pointer over the field to reveal camera, audio and exit controls; press Escape to return to administration. Enable sound on the host if broadcasting its tab audio, and avoid also playing the projector audio. Broadcast mode is local to the host browser and does not pause or change the match; exiting it restores the controls.
 
@@ -148,21 +152,24 @@ Audience phones poll a small `/api/audience` JSON summary every two seconds (ten
 
 Prediction tests cover full-team lobbies, replacement/idempotence, validation/rate limits, host-start locking, Reorg, Golden Goal, host-ended results, reset/rematch behavior and bounded memory. HTTP integration tests exercise cookies, refresh identity, payload/origin validation and server-side locking. The mobile browser flow covers entry from a full lobby, picks and changes, refresh, shared totals, locking and rematch lobby reset.
 
-## Quieter mobile gameplay HUD
+## Mobile visibility and Safari display
 
-Landscape player views use a thin score/time rail and low-ink controls. On wider phones the joystick and action buttons sit in gutters beside the arena. Small phones retain the field width and use translucent bottom-corner controls. The separate name card, possession banner and pitch branding are removed; the in-world YOU marker and possession ring, action-button border, charge ring, RELEASE label and dash cooldown carry the important feedback. Countdown instructions still teach tap to pass and hold to shoot.
+Player phones use the full available width, a thin score/time rail and a closer camera that tracks their own player while looking slightly toward the ball. Short browser-bar-constrained viewports increase the camera zoom to preserve useful character size. The camera never rotates; FIELD provides a full-arena overview and PLAYER restores the close view. The in-world YOU marker and attack-direction cue remain visible after team changes.
 
-The joystick keeps an 84–88 px target, pass/shoot is 76–80 px and dash is 48–52 px. Knob travel stays inside its ring. Fullscreen and safe areas use the same layout, and the Reorg reveal expands across the entire phone. Spectator and host scoreboards keep their event presentation. Golden Goal/final-minute cues sit near the top of the field during mobile play, rather than covering midfield.
+The phone ball marker is drawn from the actual smoothed ball position above player labels: a **14 CSS-pixel white core**, dark outline and restrained contrasting rim. It remains readable in both camera modes without altering authoritative ball physics. If the ball is offscreen or beneath a thumb control, a BALL arrow preserves direction. Labels reserve projected character bounds; unplaceable noncritical phone labels yield to players and ball readability. Spectator labels remain available.
 
-The independent critic scored the crowded baseline **5.9/10** and approved the revision at **8.5/10 for visual clarity** and **8.4/10 for player UX**. These are screenshot-based qualitative scores, not physical-device comfort or network measurements. See `VISUAL_REVIEW.md` for evidence. Rehearse on the actual iPhone/Android devices used at the event.
+Controls use dark translucent backplates with clear labels over turf. Joystick targets remain 84–88 px, pass/shoot 76–80 px, and dash 48–52 px. Knob travel stays inside its ring. The redundant name/possession banners are removed; possession accent, charge ring, RELEASE text and cooldown remain. Reorg reveals still expand across the entire phone. Host/projector presentation is retained.
 
-To reproduce review screenshots, start an isolated development server (the helper resets its lobby and creates TEST participants):
+After the actual Safari screenshot exposed the limits of the earlier decluttering review, the critic reassessed visibility at **568×240** and **740×260** usable viewports. It approved the revised implementation at **8.7/10 ball visibility** and **8.5/10 player UX**, including clustered play, possession, charge/cooldown, a far-away ball, overview and screen-help states. These are screenshot-based qualitative scores. Physical iPhone Home Screen installation, browser chrome, safe-area behavior and thumb comfort still require a real-device rehearsal.
+
+To reproduce the review, use an isolated development server (the helper resets its lobby and creates TEST participants):
 
 ```sh
 PORT=3110 npm run dev
 # In another terminal:
-HUD_CAPTURE_TAG=final node scripts/capture-mobile-hud.mjs
-HUD_CAPTURE_SKILLS=1 HUD_CAPTURE_TAG=final node scripts/capture-mobile-hud.mjs
+HUD_CAPTURE_TAG=visibility node scripts/capture-mobile-hud.mjs
+HUD_CAPTURE_SKILLS=1 HUD_CAPTURE_TAG=visibility-skills node scripts/capture-mobile-hud.mjs
+HUD_CAPTURE_FAR=1 HUD_CAPTURE_TAG=visibility-far node scripts/capture-mobile-hud.mjs
 ```
 
-Screenshots and metrics are generated under `artifacts/mobile-hud/` and excluded from Git. The standard captures hold a genuine 12-player PLAYING snapshot for still review. The skills capture uses real joystick movement to acquire possession and real dash/shot input in a two-player test match, holding only the genuine charging snapshot for its still. No player positions, scores, possession or phases are injected.
+Screenshots/metrics go to `artifacts/mobile-hud/` and are excluded from Git. Standard stills hold genuine 12-player PLAYING packets; skill captures use genuine joystick/dash/shot input at 568×240; far-ball captures use actual inputs to let a second TEST player acquire and dribble the ball away. No positions, goals, possession or phases are injected. Safari UI branches are exercised with iPhone user-agent/capability emulation in Chromium; this does not constitute physical iOS installation/fullscreen testing.

@@ -60,3 +60,35 @@ test("camera pans and zooms smoothly while keeping frame bounded", () => {
   }
   assert.ok(Math.abs(c.zoom - target.zoom) < 0.001);
 });
+
+test("phone camera enlarges players in a short Safari viewport and keeps the controlled player framed", async () => {
+  const { playerCameraTarget } = await import("../src/camera");
+  const g = new Game();
+  const player = g.join("Alex", "LEADERS", 0);
+  g.phase = "PLAYING";
+  for (const x of [17, 310, 600, 1183]) {
+    for (const y of [17, 350, 683]) {
+      Object.assign(g.players.get(player.id)!, { x, y });
+      g.ball.x = 1200 - x;
+      g.ball.y = 700 - y;
+      const frame = playerCameraTarget(g.snapshot(0), player.id, 212);
+      assert.ok(frame.zoom >= 2 && frame.zoom <= 2.2);
+      assert.ok(Math.abs(x + 60 - frame.x) <= 660 / frame.zoom);
+      assert.ok(Math.abs(y + 50 - frame.y) <= 400 / frame.zoom);
+    }
+  }
+  const short = playerCameraTarget(g.snapshot(0), player.id, 212);
+  const tall = playerCameraTarget(g.snapshot(0), player.id, 362);
+  assert.ok(short.zoom > tall.zoom);
+  for (const phase of ["REORG", "PAUSED", "GOAL", "FINISHED"] as const) {
+    g.phase = phase;
+    assert.deepEqual(
+      playerCameraTarget(g.snapshot(0), player.id, 212),
+      overview(),
+    );
+  }
+  assert.deepEqual(
+    playerCameraTarget(g.snapshot(0), "missing", 212),
+    overview(),
+  );
+});

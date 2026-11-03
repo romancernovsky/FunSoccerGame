@@ -747,6 +747,110 @@ export class Arena3D {
 
     this.renderer.render(this.scene, this.camera);
   }
+  /** Readability assist only: ball physics and authoritative coordinates are unchanged. */
+  drawMobileBall(c: CanvasRenderingContext2D, localId: string) {
+    const p = this.project(this.ball.position.x, 0.13, this.ball.position.z);
+    const x = (p.x * this.width) / 1320,
+      y = (p.y * this.height) / 800;
+    const blockedByThumb =
+      y > this.height - 112 && (x < 110 || x > this.width - 154);
+    const visible =
+      x >= 12 &&
+      x <= this.width - 12 &&
+      y >= 12 &&
+      y <= this.height - 12 &&
+      !blockedByThumb;
+    c.save();
+    c.setTransform(
+      c.canvas.width / this.width,
+      0,
+      0,
+      c.canvas.height / this.height,
+      0,
+      0,
+    );
+    if (visible) {
+      c.beginPath();
+      c.arc(x, y, 10, 0, Math.PI * 2);
+      c.fillStyle = "#fff08c";
+      c.fill();
+      c.beginPath();
+      c.arc(x, y, 8, 0, Math.PI * 2);
+      c.fillStyle = "#fffef0";
+      c.fill();
+      c.lineWidth = 2;
+      c.strokeStyle = "#102532";
+      c.stroke();
+      c.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = (i * Math.PI * 2) / 5 - Math.PI / 2;
+        const px = x + Math.cos(a) * 3.4,
+          py = y + Math.sin(a) * 3.4;
+        if (!i) c.moveTo(px, py);
+        else c.lineTo(px, py);
+      }
+      c.closePath();
+      c.fillStyle = "#102532";
+      c.fill();
+    } else {
+      const dx = x - this.width / 2,
+        dy = y - this.height / 2;
+      const t = Math.min(
+        (this.width / 2 - 28) / Math.max(1, Math.abs(dx)),
+        (this.height / 2 - 30) / Math.max(1, Math.abs(dy)),
+        1,
+      );
+      const bx = Math.max(
+        28,
+        Math.min(this.width - 28, this.width / 2 + dx * t),
+      );
+      let by = Math.max(
+        28,
+        Math.min(this.height - 34, this.height / 2 + dy * t),
+      );
+      if (bx < 120 || bx > this.width - 160)
+        by = Math.min(by, this.height - 128);
+      c.fillStyle = "#0b2435ee";
+      c.strokeStyle = "#fff08c";
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.roundRect(bx - 22, by - 20, 44, 40, 9);
+      c.fill();
+      c.stroke();
+      c.save();
+      c.translate(bx, by - 5);
+      c.rotate(Math.atan2(dy, dx));
+      c.strokeStyle = "#fff8bc";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(-7, 0);
+      c.lineTo(7, 0);
+      c.moveTo(2, -5);
+      c.lineTo(7, 0);
+      c.lineTo(2, 5);
+      c.stroke();
+      c.restore();
+      c.fillStyle = "#fff8bc";
+      c.font = "700 9px sans-serif";
+      c.textAlign = "center";
+      c.fillText("BALL", bx, by + 12);
+    }
+    c.restore();
+    c.canvas.dataset.ballVisibility = visible ? "visible" : "direction";
+    c.canvas.dataset.ballCorePixels = "14";
+    c.canvas.dataset.ballX = x.toFixed(1);
+    c.canvas.dataset.ballY = y.toFixed(1);
+    const local = this.actors.get(localId);
+    if (local) {
+      const head = this.project(
+        local.root.position.x,
+        0.8,
+        local.root.position.z,
+      );
+      c.canvas.dataset.playerX = ((head.x * this.width) / 1320).toFixed(1);
+      c.canvas.dataset.playerY = ((head.y * this.height) / 800).toFixed(1);
+    }
+  }
   private project(x: number, y: number, z: number) {
     this.v.set(x, y, z).project(this.camera);
     return {
@@ -771,14 +875,29 @@ export class Arena3D {
       a.y < b.y + b.h + 3 &&
       a.y + a.h + 3 > b.y;
     const bodies = actors.map(({ a }) => {
-      const pos = this.project(a.root.position.x, 0.55, a.root.position.z);
-      return { x: pos.x - 23, y: pos.y - 23, w: 46, h: 56 };
+      const ground = this.project(a.root.position.x, 0, a.root.position.z);
+      const head = this.project(a.root.position.x, 1.15, a.root.position.z);
+      const edge = this.project(
+        a.root.position.x + 0.32,
+        0.5,
+        a.root.position.z,
+      );
+      const halfWidth = Math.max(23, Math.abs(edge.x - ground.x) + 5);
+      return {
+        x: ground.x - halfWidth,
+        y: head.y - 5,
+        w: halfWidth * 2,
+        h: ground.y - head.y + 14,
+      };
     });
+    const fontSize = mobile ? Math.max(18, (9 * 1320) / this.width) : 14;
     c.save();
     c.textAlign = "center";
-    c.font = `800 ${mobile ? 18 : 14}px sans-serif`;
+    c.font = `800 ${fontSize}px sans-serif`;
     for (const { p, a } of actors.sort(
-      (a, b) => Number(b.p.id === localId) - Number(a.p.id === localId),
+      (a, b) =>
+        (b.p.id === localId ? 2 : b.p.id === state.ball.owner ? 1 : 0) -
+        (a.p.id === localId ? 2 : a.p.id === state.ball.owner ? 1 : 0),
     )) {
       const ground = this.project(a.root.position.x, 0, a.root.position.z),
         head = this.project(a.root.position.x, 1.05, a.root.position.z);
@@ -786,7 +905,7 @@ export class Arena3D {
         continue;
       const text = p.name.toUpperCase(),
         w = c.measureText(text).width + 17,
-        h = mobile ? 25 : 22;
+        h = mobile ? Math.max(25, (13 * 800) / this.height) : 22;
       let box: Rect = { x: ground.x - w / 2, y: ground.y + 9, w, h };
       let found = false;
       for (const dy of [9, 36, -78, 64, -106, 92, -134]) {
@@ -808,6 +927,8 @@ export class Arena3D {
         }
         if (found) break;
       }
+      if (mobile && !found && p.id !== localId && p.id !== state.ball.owner)
+        continue;
       placed.push(box);
       c.lineWidth = 1;
       if (
@@ -841,13 +962,13 @@ export class Arena3D {
         c.fillStyle = "#153140";
         c.font = "900 20px sans-serif";
         c.fillText("YOU", bx + 28, by + 21);
-        c.font = `800 ${mobile ? 18 : 14}px sans-serif`;
+        c.font = `800 ${fontSize}px sans-serif`;
       }
       if (p.keeper) {
         c.fillStyle = "#f6ffd6";
         c.font = "800 11px sans-serif";
         c.fillText("GK", head.x, head.y - 4);
-        c.font = `800 ${mobile ? 18 : 14}px sans-serif`;
+        c.font = `800 ${fontSize}px sans-serif`;
       }
       if (p.chargeAt) {
         const value = Math.min(1, (state.now - p.chargeAt) / 1000);

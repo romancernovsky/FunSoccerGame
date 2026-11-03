@@ -56,3 +56,28 @@ export function smoothCamera(
     zoom: nextZoom,
   };
 }
+
+/** Phone play follows the controlled player, keeping orientation fixed. */
+export function playerCameraTarget(
+  state: Snapshot,
+  localId: string,
+  height: number,
+): Camera {
+  const player = state.players.find((p) => p.id === localId);
+  if (!player || !["PLAYING", "GOLDEN_GOAL"].includes(state.phase))
+    return overview();
+  // Preserve a useful character size when Safari leaves only a short viewport.
+  const zoom = clamp(440 / Math.max(160, height), 1.6, 2.2);
+  const ownBall = state.ball.owner === localId;
+  const leadX = ownBall
+    ? player.fx * 70
+    : clamp((state.ball.x - player.x) * 0.25, -100, 100);
+  const leadY = ownBall
+    ? player.fy * 50
+    : clamp((state.ball.y - player.y) * 0.2, -65, 65);
+  return {
+    x: clamp(player.x + 60 + leadX, 660 / zoom, 1320 - 660 / zoom),
+    y: clamp(player.y + 50 + leadY, 400 / zoom, 800 - 400 / zoom),
+    zoom,
+  };
+}

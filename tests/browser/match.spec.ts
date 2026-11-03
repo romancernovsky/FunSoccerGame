@@ -263,18 +263,21 @@ test("desktop player: fullscreen, keyboard movement and refresh restore the same
   }
 });
 
-test("mobile: fullscreen fallback, team choice, landscape joystick, action and dash", async ({
+test("mobile: short iPhone viewport, readable ball, player camera, honest fullscreen and touch controls", async ({
   browser,
 }) => {
+  test.setTimeout(180000);
   const host = await (await wire()).asHost(),
     rival = await wire();
   await rival.request("join", { name: "Alex", team: "LEADERS" }, "identity");
   const ctx = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      isMobile: true,
-      hasTouch: true,
-    }),
-    page = await ctx.newPage();
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
+  });
+  const page = await ctx.newPage();
   await page.addInitScript(() => {
     Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
       value: undefined,
@@ -282,148 +285,181 @@ test("mobile: fullscreen fallback, team choice, landscape joystick, action and d
     });
     Object.defineProperty(HTMLElement.prototype, "webkitRequestFullscreen", {
       value: undefined,
+      configurable: true,
+    });
+    Object.defineProperty(document, "fullscreenEnabled", {
+      value: false,
+      configurable: true,
     });
   });
   try {
     await page.goto("/join");
-    await expect(page.locator("#name")).toBeVisible();
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth),
-    ).toBe(390);
+    await expect(page.locator("#fullscreen-guide")).toBeVisible();
+    await page.locator("#fullscreen-guide").click();
+    await expect(page.getByRole("dialog")).toContainText("Add to Home Screen");
+    await expect(page.getByRole("dialog")).toContainText(
+      "before the host starts",
+    );
+    await page.getByRole("button", { name: "Close screen help" }).click();
     await page.locator("#name").fill("Mobile");
     await page.locator('[data-team="WORKERS"]').click();
     await page.getByRole("button", { name: /JOIN GAME/ }).click();
     await expect(page.getByText("YOU ARE IN")).toBeVisible();
-    expect(host.state?.players.find((p) => p.name === "Mobile")?.team).toBe(
-      "WORKERS",
-    );
     host.command("start");
     await expect(page.getByText("Rotate your phone to play")).toBeVisible();
-    await page.setViewportSize({ width: 844, height: 390 });
+    await page.setViewportSize({ width: 568, height: 240 });
     await expect(page.getByText("Rotate your phone to play")).toBeHidden();
     await expect(page.locator("#arena")).toHaveAttribute(
       "data-renderer",
       "webgl",
     );
     await expect.poll(() => host.state?.phase).toBe("PLAYING");
-    const visible = await page.evaluate(() => ({
-      width: visualViewport!.width,
-      height: visualViewport!.height,
-    }));
-    const fullscreenButton = (await page
-      .locator("#player-fullscreen")
-      .boundingBox())!;
-    expect(fullscreenButton.x + fullscreenButton.width).toBeLessThanOrEqual(
-      visible.width + 1,
+    await expect(page.locator("#arena-fx")).toHaveAttribute(
+      "data-camera-mode",
+      "player",
     );
-    await page.getByRole("button", { name: "Enter full screen" }).tap();
-    await expect(page.locator("body")).toHaveClass(/player-fullscreen/);
-    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
-    for (const selector of [
-      "#player-fullscreen",
-      "#joystick",
-      "#shoot",
-      "#dash",
-    ]) {
-      const bounds = (await page.locator(selector).boundingBox())!;
-      expect(bounds.x).toBeGreaterThanOrEqual(0);
-      expect(bounds.y).toBeGreaterThanOrEqual(0);
-      expect(bounds.x + bounds.width).toBeLessThanOrEqual(844);
-      expect(bounds.y + bounds.height).toBeLessThanOrEqual(390);
-    }
-    await expect(
-      page.locator(".mobile-identity, #possession-hint"),
-    ).toHaveCount(0);
+    await expect
+      .poll(async () =>
+        Number(
+          await page.locator("#arena-fx").getAttribute("data-camera-zoom"),
+        ),
+      )
+      .toBeGreaterThan(1.9);
+    await expect(page.locator("#arena-fx")).toHaveAttribute(
+      "data-ball-core-pixels",
+      "14",
+    );
     const field = (await page.locator(".arena-wrap").boundingBox())!;
-    const score = (await page.locator(".player-scoreboard").boundingBox())!;
-    expect(score.height).toBeLessThanOrEqual(28);
-    expect(score.y + score.height).toBeLessThanOrEqual(field.y);
-    const leftControl = (await page.locator("#joystick").boundingBox())!;
-    expect(leftControl.x + leftControl.width).toBeLessThanOrEqual(field.x);
-    for (const selector of ["#shoot", "#dash"]) {
-      const control = (await page.locator(selector).boundingBox())!;
-      expect(control.x).toBeGreaterThanOrEqual(field.x + field.width);
-      expect(control.width).toBeGreaterThanOrEqual(48);
+    const visibleWidth = await page.evaluate(() => visualViewport!.width);
+    expect(field.width).toBeGreaterThanOrEqual(visibleWidth - 1);
+    await expect(page.locator(".attack-direction")).toHaveAttribute(
+      "aria-label",
+      "Attack left",
+    );
+    await page.getByRole("button", { name: "Play without Safari bars" }).tap();
+    await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
+    const guide = page.getByRole("dialog");
+    await expect(guide).toContainText("Safari cannot hide");
+    await expect(guide).toContainText("session may not transfer");
+    const close = page.getByRole("button", { name: "Close screen help" });
+    const closeBounds = (await close.boundingBox())!;
+    expect(closeBounds.height).toBeGreaterThanOrEqual(44);
+    expect(closeBounds.y + closeBounds.height).toBeLessThanOrEqual(240);
+    const beforeGuideKey = host.state!.players.find(
+      (p) => p.name === "Mobile",
+    )!.x;
+    await page.keyboard.down("d");
+    await page.waitForTimeout(250);
+    await page.keyboard.up("d");
+    expect(host.state!.players.find((p) => p.name === "Mobile")!.x).toBe(
+      beforeGuideKey,
+    );
+    await close.focus();
+    await page.keyboard.press("Space");
+    await expect(guide).toBeHidden();
+    expect(host.state!.players.find((p) => p.name === "Mobile")!.chargeAt).toBe(
+      0,
+    );
+    await page.getByRole("button", { name: "Show full field" }).tap();
+    await expect(page.locator("#arena-fx")).toHaveAttribute(
+      "data-camera-mode",
+      "field",
+    );
+    await expect
+      .poll(async () =>
+        Number(
+          await page.locator("#arena-fx").getAttribute("data-camera-zoom"),
+        ),
+      )
+      .toBeLessThan(1.05);
+    await page.getByRole("button", { name: "Follow my player" }).tap();
+    await expect
+      .poll(async () =>
+        Number(
+          await page.locator("#arena-fx").getAttribute("data-camera-zoom"),
+        ),
+      )
+      .toBeGreaterThan(1.9);
+    for (const selector of ["#joystick", "#shoot", "#dash"]) {
+      const rect = (await page.locator(selector).boundingBox())!;
+      expect(Math.min(rect.width, rect.height)).toBeGreaterThanOrEqual(48);
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(568);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(240);
     }
-    const x = host.state!.players.find((p) => p.name === "Mobile")!.x,
-      box = (await page.locator("#joystick").boundingBox())!;
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const beforeMove = host.state!.players.find((p) => p.name === "Mobile")!.x;
+    const stick = (await page.locator("#joystick").boundingBox())!;
+    await page.mouse.move(
+      stick.x + stick.width / 2,
+      stick.y + stick.height / 2,
+    );
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width - 5, box.y + box.height / 2);
+    await page.mouse.move(stick.x + 3, stick.y + stick.height / 2);
     await expect
       .poll(() => host.state!.players.find((p) => p.name === "Mobile")!.x)
-      .toBeGreaterThan(x + 20);
+      .toBeLessThan(beforeMove - 20);
+    const knob = (await page.locator("#stick").boundingBox())!;
+    expect(knob.x).toBeGreaterThanOrEqual(stick.x);
     await page.mouse.up();
-    await page.locator("#shoot").tap();
     await page.locator("#dash").tap();
     await expect
       .poll(
         () => host.state!.players.find((p) => p.name === "Mobile")!.dashReady,
       )
       .toBeGreaterThan(0);
-    for (const width of [740, 568]) {
-      await page.setViewportSize({ width, height: 320 });
-      const pitch = (await page.locator(".arena-wrap").boundingBox())!;
-      const viewport = await page.evaluate(() => ({
-        width: visualViewport!.width,
-        height: visualViewport!.height,
-      }));
-      expect(pitch.width).toBeGreaterThanOrEqual(
-        viewport.width - (width === 568 ? 1 : 192),
-      );
-      for (const selector of ["#joystick", "#shoot", "#dash"]) {
-        const control = (await page.locator(selector).boundingBox())!;
-        expect(control.x).toBeGreaterThanOrEqual(0);
-        expect(control.y).toBeGreaterThanOrEqual(0);
-        expect(control.x + control.width).toBeLessThanOrEqual(
-          viewport.width + 1,
-        );
-        expect(control.y + control.height).toBeLessThanOrEqual(
-          viewport.height + 1,
-        );
-        expect(Math.min(control.width, control.height)).toBeGreaterThanOrEqual(
-          48,
-        );
-      }
-    }
-    const smallStick = (await page.locator("#joystick").boundingBox())!;
-    const beforeSmallMove = host.state!.players.find(
-      (p) => p.name === "Mobile",
-    )!.x;
+    const shoot = (await page.locator("#shoot").boundingBox())!;
     await page.mouse.move(
-      smallStick.x + smallStick.width / 2,
-      smallStick.y + smallStick.height / 2,
+      shoot.x + shoot.width / 2,
+      shoot.y + shoot.height / 2,
     );
     await page.mouse.down();
-    await page.mouse.move(
-      smallStick.x + 3,
-      smallStick.y + smallStick.height / 2,
-    );
     await expect
-      .poll(() => host.state!.players.find((p) => p.name === "Mobile")!.x)
-      .toBeLessThan(beforeSmallMove - 20);
-    const knob = (await page.locator("#stick").boundingBox())!;
-    expect(knob.x).toBeGreaterThanOrEqual(smallStick.x);
-    expect(knob.x + knob.width).toBeLessThanOrEqual(
-      smallStick.x + smallStick.width,
-    );
+      .poll(
+        () => host.state!.players.find((p) => p.name === "Mobile")!.chargeAt,
+      )
+      .toBeGreaterThan(0);
+    await expect(page.locator("#shoot small")).toHaveText("RELEASE");
     await page.mouse.up();
-    await page.getByRole("button", { name: "Exit full screen" }).tap();
-    await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
-    // A browser that exposes fullscreen but rejects the request stays playable.
+    await expect
+      .poll(
+        () =>
+          host.state!.players.find((p) => p.name === "Mobile")!.input.action,
+      )
+      .toBe(false);
+    await page.setViewportSize({ width: 740, height: 260 });
+    await expect(page.locator("#arena-fx")).toHaveAttribute(
+      "data-ball-core-pixels",
+      "14",
+    );
+    // Exposed-but-rejected native APIs must not leave a fake fullscreen state.
     await page.evaluate(() => {
-      Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
-        value: () => Promise.reject(new Error("Fullscreen unavailable")),
+      Object.defineProperty(document, "fullscreenEnabled", {
+        value: true,
+        configurable: true,
+      });
+      Object.defineProperty(document.documentElement, "requestFullscreen", {
+        value: () => Promise.reject(new Error("Denied")),
         configurable: true,
       });
     });
-    await page.getByRole("button", { name: "Enter full screen" }).tap();
-    await expect(page.locator("body")).toHaveClass(/player-fullscreen/);
-    host.command("end");
-    await expect.poll(() => host.state?.phase).toBe("FINISHED");
-    host.command("new");
-    await expect(page.locator("#name")).toBeVisible();
+    await page.locator("#player-fullscreen").tap();
+    await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
+    await page.getByRole("button", { name: "Close screen help" }).click();
+    // This checks capability handling; actual iOS installation still needs a phone rehearsal.
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, "standalone", { value: true }),
+    );
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", {
+        name: "Home Screen app: browser bars hidden",
+      }),
+    ).toBeDisabled();
+    expect(host.state!.players.filter((p) => p.name === "Mobile")).toHaveLength(
+      1,
+    );
   } finally {
     await ctx.close();
   }

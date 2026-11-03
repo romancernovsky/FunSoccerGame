@@ -1,3 +1,4 @@
+import { displayCapabilities, showDisplayHelp } from "./display-mode";
 import { startAudience } from "./audience";
 import { predictionSummary } from "./prediction-view";
 import { reorgView } from "./reorg-view";
@@ -11,7 +12,13 @@ import "@fontsource/dm-sans/latin-600.css";
 import "@fontsource/dm-sans/latin-700.css";
 import { Arena3D } from "./renderer3d";
 import { drawCelebration } from "./visuals";
-import { cameraTarget, smoothCamera, overview, type Camera } from "./camera";
+import {
+  cameraTarget,
+  playerCameraTarget,
+  smoothCamera,
+  overview,
+  type Camera,
+} from "./camera";
 import QRCode from "qrcode";
 import {
   FIELD as F,
@@ -208,6 +215,7 @@ window.visualViewport?.addEventListener("scroll", updateGameViewport);
 window.addEventListener("resize", updateGameViewport);
 updateGameViewport();
 let playerFullscreen = false;
+let playerOverview = false;
 let broadcast = false;
 let followCamera = true;
 type FullscreenDocument = Document & {
@@ -233,6 +241,13 @@ function exitBrowserFullscreen() {
 }
 function setPlayerFullscreen(enabled: boolean, requestBrowser = true) {
   stopInput();
+  if (enabled && requestBrowser) {
+    const capabilities = displayCapabilities();
+    if (!capabilities.native) {
+      showDisplayHelp(capabilities.appleTouch);
+      return;
+    }
+  }
   playerFullscreen = enabled;
   signature = "";
   render();
@@ -244,20 +259,34 @@ function setPlayerFullscreen(enabled: boolean, requestBrowser = true) {
   const root = document.documentElement as FullscreenRoot;
   if (fullscreenElement()) return;
   try {
-    // iPhone browsers without element fullscreen still get the viewport layout.
+    // Native fullscreen is requested only when the browser advertises support.
     void Promise.resolve(
       (root.requestFullscreen ?? root.webkitRequestFullscreen)?.call(root),
     )
       .then(() => {
         if (!playerFullscreen) exitBrowserFullscreen();
       })
-      .catch(() => {});
+      .catch(() => {
+        setPlayerFullscreen(false, false);
+        showDisplayHelp(displayCapabilities().appleTouch);
+      });
   } catch {
-    // Keep the playable viewport layout when native fullscreen is unavailable.
+    setPlayerFullscreen(false, false);
+    showDisplayHelp(displayCapabilities().appleTouch);
   }
 }
 function playerToolbar() {
-  return `<div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${playerFullscreen ? "Exit" : "Enter"} full screen" aria-pressed="${playerFullscreen}"><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
+  const capabilities = displayCapabilities();
+  const help = !capabilities.native && !capabilities.standalone;
+  const label = capabilities.standalone
+    ? "Home Screen app: browser bars hidden"
+    : help
+      ? capabilities.appleTouch
+        ? "Play without Safari bars"
+        : "Fullscreen options"
+      : `${playerFullscreen ? "Exit" : "Enter"} full screen`;
+  const attackRight = me()?.team !== "WORKERS";
+  return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow my player" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "PLAYER" : "FIELD"}</span></button><span class="attack-direction ${me()?.team.toLowerCase() ?? ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
 }
 function watchToolbar() {
   return `<div class="watch-toolbar"><span class="eyebrow"><i class="live-dot"></i> LIVE BROADCAST</span><div><button class="secondary compact" id="watch-sound">${sound ? "◖ Sound on" : "◖ Enable sound"}</button><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "↙ Exit broadcast" : "⛶ Broadcast mode"}</button></div></div>`;
@@ -276,7 +305,12 @@ function joinPanel() {
   }
   if (active())
     return `<section class="pin-panel"><span class="eyebrow">THE PITCH IS BUSY</span><h1>Match in progress<span class="accent">.</span></h1><p>Please wait for the next game.</p><a class="primary" href="/predict">FOLLOW AUDIENCE PICKS ↗</a><a class="text-link" href="/screen">Watch the match ↗</a></section>`;
-  return `<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br>Make some<br><em>noise.</em></h1><p>The five-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME <span>↗</span></button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
+  const display = displayCapabilities();
+  const launchTip =
+    display.appleTouch && !display.native && !display.standalone
+      ? '<aside class="ios-launch-tip"><p><strong>More room on iPhone.</strong> Use a Home Screen web app to remove Safari bars. Set it up before joining.</p><button id="fullscreen-guide" class="secondary compact">HOW TO OPEN</button></aside>'
+      : "";
+  return `${launchTip}<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br>Make some<br><em>noise.</em></h1><p>The five-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME <span>↗</span></button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
 }
 function spectator() {
   if (active())
@@ -301,6 +335,7 @@ function render() {
     state.dev,
     broadcast,
     playerFullscreen,
+    playerOverview,
     state.predictions,
     followCamera,
   ]);
@@ -378,6 +413,15 @@ function confirmCommand(action: string) {
   dialog.addEventListener("cancel", () => dialog.remove());
 }
 function bind() {
+  document
+    .querySelector("#fullscreen-guide")
+    ?.addEventListener("click", () => showDisplayHelp(true));
+  document.querySelector("#player-camera")?.addEventListener("click", () => {
+    stopInput();
+    playerOverview = !playerOverview;
+    signature = "";
+    render();
+  });
   document
     .querySelector("#player-fullscreen")
     ?.addEventListener("click", () => {
@@ -521,7 +565,8 @@ window.addEventListener("keydown", (e) => {
     !me() ||
     !state ||
     !["PLAYING", "GOLDEN_GOAL"].includes(state.phase) ||
-    (e.target as HTMLElement).matches("input")
+    (e.target as HTMLElement).matches("input") ||
+    !!document.querySelector("dialog[open]")
   )
     return;
   if (
@@ -549,6 +594,7 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => {
   keys.delete(e.key.toLowerCase());
+  if (document.querySelector("dialog[open]")) return;
   if (e.key === " ") setAction(false);
   if (e.key === "Shift") {
     input.dash = false;
@@ -742,11 +788,13 @@ function draw(time: number) {
   const target = world3d.renderer.domElement,
     r = target.getBoundingClientRect();
   if (!r.width || !r.height) return;
-  camera = smoothCamera(
-    camera,
-    cameraTarget(state, host && hostReady && followCamera),
-    dt,
-  );
+  const phonePlayer =
+    join && !!identity && matchMedia("(pointer: coarse)").matches;
+  const framingTarget =
+    phonePlayer && !playerOverview
+      ? playerCameraTarget(state, identity!, r.height)
+      : cameraTarget(state, host && hostReady && followCamera);
+  camera = smoothCamera(camera, framingTarget, dt);
   world3d.render(state, time, dt, camera, identity, r.width, r.height);
   const fx = document.querySelector<HTMLCanvasElement>("#arena-fx")!,
     ctx = fx.getContext("2d")!;
@@ -766,6 +814,11 @@ function draw(time: number) {
     identity,
     join && matchMedia("(pointer:coarse)").matches,
   );
+  if (phonePlayer) {
+    world3d.drawMobileBall(ctx, identity!);
+    fx.dataset.cameraZoom = camera.zoom.toFixed(2);
+    fx.dataset.cameraMode = playerOverview ? "field" : "player";
+  }
   if (host && hostReady && followCamera) drawOverview(ctx, camera);
   const overlay = document.querySelector<HTMLElement>("#arena-overlay")!;
   const phase = state.phase;
@@ -853,7 +906,8 @@ function draw(time: number) {
     const cooldown = p
       ? Math.max(0, (p.dashReady - Date.now() - serverOffset) / 1000)
       : 0;
-    dash.style.opacity = cooldown > 0 ? ".65" : "1";
+    dash.style.opacity = "1";
+    dash.classList.toggle("on-cooldown", cooldown > 0);
     const label = dash.querySelector("small");
     if (label)
       label.textContent = cooldown > 0 ? `${cooldown.toFixed(1)}s` : "DASH";

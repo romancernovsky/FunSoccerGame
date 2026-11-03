@@ -164,6 +164,7 @@ const server = createServer(async (req, res) => {
             ".js": "text/javascript",
             ".css": "text/css",
             ".svg": "image/svg+xml",
+            ".webmanifest": "application/manifest+json",
             ".png": "image/png",
             ".ico": "image/x-icon",
           } as Record<string, string>

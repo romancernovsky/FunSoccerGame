@@ -5,6 +5,7 @@ const base = process.env.HUD_CAPTURE_URL || "http://127.0.0.1:3110";
 const tag = process.env.HUD_CAPTURE_TAG || "after";
 const out = "artifacts/mobile-hud";
 const skills = process.env.HUD_CAPTURE_SKILLS === "1";
+const far = process.env.HUD_CAPTURE_FAR === "1";
 const admin = new WebSocket(base.replace(/^http/, "ws") + "/ws");
 let state;
 admin.on("message", (raw) => {
@@ -47,9 +48,13 @@ try {
     args: ["--no-sandbox"],
   });
   const context = await browser.newContext({
-    viewport: { width: 844, height: 390 },
+    viewport: skills
+      ? { width: 568, height: 240 }
+      : { width: 844, height: 390 },
     isMobile: true,
     hasTouch: true,
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
   });
   const page = await context.newPage();
   await page.addInitScript(() => {
@@ -69,9 +74,22 @@ try {
       if (m.type === "state") {
         if (frozen) return;
         // Hold a genuine server snapshot for still review, without changing gameplay.
-        if (!skills && m.data.phase === "PLAYING" && m.data.remaining < 297)
+        if (
+          !skills &&
+          !far &&
+          m.data.phase === "PLAYING" &&
+          m.data.remaining < 297
+        )
           frozen = m.data;
         const local = m.data.players.find((p) => p.name === "TEST Maya");
+        if (
+          far &&
+          local &&
+          m.data.phase === "PLAYING" &&
+          m.data.ball.owner &&
+          Math.hypot(m.data.ball.x - local.x, m.data.ball.y - local.y) > 800
+        )
+          frozen = m.data;
         if (
           skills &&
           freezeCharge &&
@@ -87,7 +105,7 @@ try {
   await page.locator("#name").fill("TEST Maya");
   await page.getByRole("button", { name: /JOIN GAME/ }).click();
   await page.getByText("YOU ARE IN").waitFor();
-  if (skills) {
+  if (skills || far) {
     admin.send(
       JSON.stringify({
         type: "join",
@@ -100,6 +118,31 @@ try {
     await wait(() => state.players.length === 12);
   }
   command("start");
+  if (far) {
+    await wait(() => state.phase === "PLAYING");
+    const rival = () => state.players.find((p) => p.name === "TEST Rival");
+    const sendInput = (x, y) =>
+      admin.send(
+        JSON.stringify({
+          type: "input",
+          data: { x, y, action: false, dash: false },
+        }),
+      );
+    for (let i = 0; i < 200 && state.ball.owner !== rival().id; i++) {
+      const dx = state.ball.x - rival().x,
+        dy = state.ball.y - rival().y;
+      const length = Math.hypot(dx, dy) || 1;
+      sendInput(dx / length, dy / length);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (state.ball.owner !== rival().id)
+      throw Error("TEST Rival did not acquire the ball");
+    for (let i = 0; i < 200 && !frozen; i++) {
+      sendInput(1, 0);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    sendInput(0, 0);
+  }
   await wait(() => (skills ? state.phase === "PLAYING" : frozen));
   await page.locator('#arena[data-renderer="webgl"]').waitFor();
   if (skills) {
@@ -162,8 +205,8 @@ try {
     const metrics = [];
     for (const [label, width, height] of [
       ["wide", 844, 390],
-      ["short", 740, 320],
-      ["small", 568, 320],
+      ["short", 740, 260],
+      ["small", 568, 240],
     ]) {
       await page.setViewportSize({ width, height });
       await page.evaluate(
@@ -172,6 +215,15 @@ try {
             requestAnimationFrame(() => requestAnimationFrame(resolve)),
           ),
       );
+      await page.waitForFunction(() => {
+        const canvas = document.querySelector("#arena-fx");
+        const height = canvas.getBoundingClientRect().height;
+        const expected = Math.max(
+          1.6,
+          Math.min(2.2, 440 / Math.max(160, height)),
+        );
+        return Math.abs(Number(canvas.dataset.cameraZoom) - expected) < 0.07;
+      });
       await page.screenshot({ path: `${out}/${tag}-${label}.png` });
       metrics.push(
         await page.evaluate(
@@ -182,6 +234,7 @@ try {
               .querySelector(".arena-wrap")
               .getBoundingClientRect()
               .toJSON(),
+            visibility: { ...document.querySelector("#arena-fx").dataset },
             controls: [
               ...document.querySelectorAll("#joystick, #shoot, #dash"),
             ].map((e) => ({
@@ -193,9 +246,15 @@ try {
         ),
       );
     }
-    await page.setViewportSize({ width: 844, height: 390 });
-    await page.getByRole("button", { name: "Enter full screen" }).tap();
-    await page.screenshot({ path: `${out}/${tag}-fullscreen.png` });
+    await page.getByRole("button", { name: "Show full field" }).tap();
+    await page.waitForFunction(
+      () =>
+        Number(document.querySelector("#arena-fx").dataset.cameraZoom) < 1.05,
+    );
+    await page.screenshot({ path: `${out}/${tag}-overview.png` });
+    await page.getByRole("button", { name: "Follow my player" }).tap();
+    await page.getByRole("button", { name: "Play without Safari bars" }).tap();
+    await page.screenshot({ path: `${out}/${tag}-safari-help.png` });
     await writeFile(
       `${out}/${tag}-metrics.json`,
       JSON.stringify(
@@ -210,7 +269,7 @@ try {
       ),
     );
     console.log(
-      `Captured ${tag} mobile HUD at 844×390, 740×320, 568×320 and fullscreen. Genuine PLAYING snapshot with ${frozen.players.length} TEST participants held for stills.`,
+      `Captured ${tag} mobile view at 844×390, 740×260, 568×240, overview and Safari instructions. Genuine PLAYING snapshot with ${frozen.players.length} TEST participants held for stills.`,
     );
   }
 } finally {
