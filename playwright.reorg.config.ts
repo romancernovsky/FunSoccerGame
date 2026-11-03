@@ -8,7 +8,7 @@ export default defineConfig({
     url: "http://127.0.0.1:3108/healthz",
     env: {
       PORT: "3108",
-      MATCH_DURATION_SECONDS: "126",
+      MATCH_DURATION_SECONDS: "66",
     },
     reuseExistingServer: false,
   },

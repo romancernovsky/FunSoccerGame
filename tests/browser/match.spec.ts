@@ -257,7 +257,7 @@ test("desktop player: fullscreen, keyboard movement and refresh restore the same
         host.state!.players.filter((p) => p.name === "Alex").map((p) => p.id),
       )
       .toEqual([id]);
-    expect(host.state!.remaining).toBeLessThan(300);
+    expect(host.state!.remaining).toBeLessThan(180);
   } finally {
     await ctx.close();
   }

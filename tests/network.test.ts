@@ -14,6 +14,7 @@ test(
           ...process.env,
           PORT: "3102",
           HOST_PIN: undefined,
+          MATCH_DURATION_SECONDS: undefined,
           NODE_ENV: "production",
         },
         stdio: "pipe",
@@ -131,6 +132,7 @@ test(
       const before = (await audience.json()) as any;
       assert.equal(before.players, undefined);
       assert.equal(before.pick, null);
+      assert.equal(before.remaining, 180);
       const pick = (team: unknown, extra = {}, headers = {}) =>
         fetch("http://127.0.0.1:3102/api/audience", {
           method: "POST",

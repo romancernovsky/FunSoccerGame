@@ -21,6 +21,7 @@ import {
 } from "./camera";
 import QRCode from "qrcode";
 import {
+  DEFAULT_MATCH_DURATION_SECONDS,
   FIELD as F,
   REORG,
   TEAMS,
@@ -74,12 +75,14 @@ const active = () => !!state && state.phase !== "WAITING";
 const clock = () =>
   state?.golden
     ? "∞"
-    : `${Math.floor(Math.ceil(state?.remaining ?? 300) / 60)
+    : `${Math.floor(
+        Math.ceil(state?.remaining ?? DEFAULT_MATCH_DURATION_SECONDS) / 60,
+      )
         .toString()
         .padStart(
           2,
           "0",
-        )}:${(Math.ceil(state?.remaining ?? 300) % 60).toString().padStart(2, "0")}`;
+        )}:${(Math.ceil(state?.remaining ?? DEFAULT_MATCH_DURATION_SECONDS) % 60).toString().padStart(2, "0")}`;
 function send(type: string, data: unknown) {
   if (ws?.readyState === WebSocket.OPEN)
     ws.send(JSON.stringify({ type, data }));
@@ -181,7 +184,7 @@ function teamCard(team: Team, manage = false) {
   )}</div><div class="team-footer">${ps.length === (state?.maxTeamSize ?? 6) ? "TEAM FULL" : "OPEN FOR BUSINESS"}<span>${ps.filter((p) => p.connected).length} connected</span></div></section>`;
 }
 function qrCard() {
-  return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to play or predict</strong><a class="join-link" href="/join">${esc(location.host)}/join ↗</a><div class="quick-facts"><span>◷ 5 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
+  return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to play or predict</strong><a class="join-link" href="/join">${esc(location.host)}/join ↗</a><div class="quick-facts"><span>◷ 3 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
 }
 function scoreboard(player = false) {
   return `<div class="scoreboard${player ? " player-scoreboard" : ""}"><div class="score-team blue"><span>${arrow}</span> LEADERS</div><div class="score"><b id="score-l">${state?.score.LEADERS ?? 0}</b><span>:</span><b id="score-w">${state?.score.WORKERS ?? 0}</b></div><div class="score-team orange">WORKERS <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
@@ -310,7 +313,7 @@ function joinPanel() {
     display.appleTouch && !display.native && !display.standalone
       ? '<aside class="ios-launch-tip"><p><strong>More room on iPhone.</strong> Use a Home Screen web app to remove Safari bars. Set it up before joining.</p><button id="fullscreen-guide" class="secondary compact">HOW TO OPEN</button></aside>'
       : "";
-  return `${launchTip}<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br>Make some<br><em>noise.</em></h1><p>The five-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME <span>↗</span></button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
+  return `${launchTip}<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br>Make some<br><em>noise.</em></h1><p>The three-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME <span>↗</span></button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
 }
 function spectator() {
   if (active())

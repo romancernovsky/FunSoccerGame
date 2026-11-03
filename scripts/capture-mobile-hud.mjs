@@ -42,6 +42,7 @@ try {
   }
   command(state.phase === "FINISHED" ? "new" : "reset");
   await wait(() => state.phase === "WAITING" && state.players.length === 0);
+  const freezeBelow = state.remaining - 3;
   await mkdir(out, { recursive: true });
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
@@ -78,7 +79,7 @@ try {
           !skills &&
           !far &&
           m.data.phase === "PLAYING" &&
-          m.data.remaining < 297
+          m.data.remaining < freezeBelow
         )
           frozen = m.data;
         const local = m.data.players.find((p) => p.name === "TEST Maya");

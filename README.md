@@ -26,7 +26,7 @@ Players enter a unique 1–12 character name and choose a team. The host can mov
 - Steal: contact the opponent; dashing increases reach. No health or elimination.
 - Goalkeeper: larger interception range inside their marked area and secure possession for at most two seconds before automatic release.
 
-The five-minute clock pauses for celebrations, kickoff countdowns and host pauses. Three or more completed passes in the same team possession earn TEAM GOAL recognition. Ties enter unlimited Golden Goal. Host pause/resume, confirmed restart/end, rematch and new match are supported. Rematch keeps players and roles; new match clears them.
+The three-minute regulation clock pauses for celebrations, kickoff countdowns and host pauses. Three or more completed passes in the same team possession earn TEAM GOAL recognition. Ties enter unlimited Golden Goal. Host pause/resume, confirmed restart/end, rematch and new match are supported. Rematch keeps players and roles; new match clears them.
 
 Phones use a closer player camera by default. **FIELD** shows the full arena; **PLAYER** returns to your character. A high-contrast ball marker keeps the ball readable at small screen sizes; a **BALL** arrow points toward it when it is outside the view or under a control. Camera orientation stays fixed, and the attack-direction cue follows your current team.
 
@@ -55,7 +55,7 @@ The host opens `/host` directly: there is no PIN, login, or required secret. Kee
 | Variable                | Default             | Range / purpose                                        |
 | ----------------------- | ------------------- | ------------------------------------------------------ |
 | PORT                    | 3000 (Docker: 8080) | HTTP and WebSocket port                                |
-| MATCH_DURATION_SECONDS  | 300                 | 1–3600 seconds of active play                          |
+| MATCH_DURATION_SECONDS  | 180                 | 1–3600 seconds of active play                          |
 | MAX_TEAM_SIZE           | 6                   | 1–6                                                    |
 | RECONNECT_GRACE_SECONDS | 20                  | 5–120                                                  |
 | GAME_TICK_RATE          | 30                  | 20–30 Hz                                               |
@@ -76,6 +76,8 @@ gcloud run deploy office-arena --source . --region europe-west1 \
 ```
 
 For an existing GitHub-connected Cloud Run service, deploy the latest `main` commit. No host PIN or Secret Manager binding is needed. If the service already has a legacy `HOST_PIN` environment/secret reference, it can be removed in **Edit & deploy new revision → Variables & Secrets**. The Docker image listens on `0.0.0.0:8080` by default; Cloud Run's supplied `PORT` is respected.
+
+The default match is 180 seconds. If an existing Cloud Run revision explicitly sets `MATCH_DURATION_SECONDS`, set it to `180` or remove that override to use the new default. Repository updates do not replace existing Cloud Run environment settings.
 
 Cloud Run supplies `PORT` and TLS. Deploy a single revision receiving 100% of traffic; don't split traffic, use parallel revisions, or deploy during an event. Each process has separate memory. Min/max one and always-allocated CPU preserve the narrow single-match architecture, but infrastructure replacement can still lose the match. No persistence is promised. Keep the service running during the event, then reduce minimum instances to avoid ongoing idle cost.
 
@@ -121,20 +123,20 @@ The 3D browser view requires WebGL 2. If unavailable, the application displays a
 
 ## The Reorg surprise
 
-Once per match, when the authoritative clock reaches **02:00**, the organization gets a surprise Reorg. Play and the match clock stop. Players are randomly redistributed by the server, with their identities and session tokens retained. There is a two-second surprise introduction, ten seconds to read both new rosters on one screen, then a synchronized three-second countdown into a center kickoff. These fifteen seconds do not consume match time.
+Once per three-minute match, when the authoritative clock reaches **01:00**, the organization gets a surprise Reorg. Play and the match clock stop. Players are randomly redistributed by the server, with their identities and session tokens retained. There is a two-second surprise introduction, ten seconds to read both new rosters on one screen, then a synchronized three-second countdown into a center kickoff. These fifteen seconds do not consume match time. The final-minute cue plays when kickoff returns to active play.
 
 Scores stay with LEADERS and WORKERS. Current team sizes are retained and capacities are respected; a reshuffle always exchanges at least two players when both teams have members. If departures have emptied a team, remaining players are split into two sides where possible. When both teams had connected players, the shuffle keeps a connected player on both sides. Existing goalkeeper slots are preserved, with at most one assigned keeper per new team; teams without a keeper slot are not forced to have one.
 
-The host, projector and player screens show the same server-owned assignments. Phones highlight the local player's new team and hide gameplay controls during the reveal. The roster uses the full phone width, including short landscape and portrait layouts. Jerseys, nameplate colors, team identity and goalkeeper gloves update from the new authoritative assignments. The ball, positions, dash/charge state and pass sequence reset for kickoff; names, identities, score and the two remaining minutes are kept.
+The host, projector and player screens show the same server-owned assignments. Phones highlight the local player's new team and hide gameplay controls during the reveal. The roster uses the full phone width, including short landscape and portrait layouts. Jerseys, nameplate colors, team identity and goalkeeper gloves update from the new authoritative assignments. The ball, positions, dash/charge state and pass sequence reset for kickoff; names, identities, score and the remaining minute are kept.
 
-Host Pause/Resume freezes and restores the remaining reveal time. Refresh/reconnection restores the same new team rather than reshuffling again. Restart/Rematch rearms the surprise for the next full match while retaining the current players/teams; New Match clears it. Golden Goal does not trigger another Reorg. Custom matches of 120 seconds or less skip the event.
+Host Pause/Resume freezes and restores the remaining reveal time. Refresh/reconnection restores the same new team rather than reshuffling again. Restart/Rematch rearms the surprise for the next full match while retaining the current players/teams; New Match clears it. Golden Goal does not trigger another Reorg. Custom matches of 60 seconds or less skip the event.
 
 ```sh
 npm test
 npm run test:reorg
 ```
 
-The dedicated browser check starts an isolated 126-second development match, so the event arrives after six seconds of actual play. It verifies the 1v1 team swap, orange-to-blue 3D kit change, locked clock/controls, pause and player refresh during the reveal, synchronized kickoff, and movement after play resumes. Reorg screenshots are in `artifacts/reorg/`. The capture helper uses only isolated TEST participants and holds genuine REORG snapshots during still capture; it does not inject assignments or scores.
+The dedicated browser check starts an isolated 66-second development match, so the event arrives after six seconds of actual play. It verifies the 1v1 team swap, orange-to-blue 3D kit change, locked clock/controls, pause and player refresh during the reveal, synchronized kickoff, and movement after play resumes. Reorg screenshots are in `artifacts/reorg/`. The capture helper uses only isolated TEST participants and holds genuine REORG snapshots during still capture; it does not inject assignments or scores.
 
 ## Audience predictions
 

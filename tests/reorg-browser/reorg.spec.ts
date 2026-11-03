@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { WebSocket } from "ws";
 import type { Snapshot } from "../../src/shared";
-test("02:00 Reorg changes teams and kits, survives refresh/pause, then kicks off with control restored", async ({
+test("01:00 Reorg changes teams and kits, survives refresh/pause, then kicks off with control restored", async ({
   browser,
 }) => {
   const admin = new WebSocket("ws://127.0.0.1:3108/ws"),
@@ -77,7 +77,7 @@ test("02:00 Reorg changes teams and kits, survives refresh/pause, then kicks off
     );
     await expect.poll(() => phases.includes("PLAYING")).toBe(true);
     await expect.poll(() => state?.phase, { timeout: 15000 }).toBe("REORG");
-    expect(state!.remaining).toBe(120);
+    expect(state!.remaining).toBe(60);
     const assignments = structuredClone(state!.reorg!.assignments);
     expect(state!.players.find((p) => p.id === id)?.team).toBe("LEADERS");
     await expect(page.locator("#arena")).toHaveAttribute(
@@ -111,7 +111,7 @@ test("02:00 Reorg changes teams and kits, survives refresh/pause, then kicks off
     const position = state!.players.find((p) => p.id === id)!.x;
     await page.waitForTimeout(250);
     expect(state!.players.find((p) => p.id === id)!.x).toBe(position);
-    expect(state!.remaining).toBe(120);
+    expect(state!.remaining).toBe(60);
     command("pause");
     await expect.poll(() => state?.phase).toBe("PAUSED");
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -131,7 +131,7 @@ test("02:00 Reorg changes teams and kits, survives refresh/pause, then kicks off
       .toBe(2);
     expect(state!.ball.x).toBe(600);
     expect(state!.ball.owner).toBe(null);
-    expect(state!.remaining).toBeLessThanOrEqual(120);
+    expect(state!.remaining).toBeLessThanOrEqual(60);
     await expect(page.locator("#joystick")).toBeVisible();
     const box = (await page.locator("#joystick").boundingBox())!,
       x = state!.players.find((p) => p.id === id)!.x;

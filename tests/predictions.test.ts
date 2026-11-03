@@ -4,7 +4,7 @@ import { Game } from "../server/game";
 import { Predictions, PredictionError } from "../server/predictions";
 const now = 100000;
 function match() {
-  const g = new Game({ duration: 300, maxTeamSize: 6, grace: 20, dev: true });
+  const g = new Game({ duration: 180, maxTeamSize: 6, grace: 20, dev: true });
   g.join("Alex", "LEADERS", now);
   g.join("Sam", "WORKERS", now);
   return g;
@@ -72,7 +72,7 @@ test("Reorg keeps picks attached to team names, Golden Goal stays pending until 
   choose(g);
   g.command("start", { confirm: true }, now);
   g.tick(0, now + 4000);
-  g.remaining = 120.01;
+  g.remaining = 60.01;
   g.tick(0.02, now + 4020);
   assert.equal(g.phase, "REORG");
   assert.equal(g.predictions.pick("audience"), "LEADERS");

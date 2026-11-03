@@ -72,7 +72,7 @@ try {
   await new Promise((r) => setTimeout(r, 5000));
   assert.equal(states.length, 20);
   assert.ok(states.every((s) => s.players.length === 12));
-  assert.ok(states.every((s) => s.remaining < 300));
+  assert.ok(states.every((s) => s.remaining < 180));
   assert.ok(
     states.every(
       (s) =>

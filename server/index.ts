@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { resolve, extname } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 import { Game } from "./game.js";
+import { DEFAULT_MATCH_DURATION_SECONDS } from "../src/shared.js";
 const production = process.env.NODE_ENV === "production";
 function numberEnv(name: string, fallback: number, min: number, max: number) {
   const n = Number(process.env[name] ?? fallback);
@@ -27,7 +28,12 @@ const log = (event: string, data?: unknown) =>
   );
 const game = new Game(
   {
-    duration: numberEnv("MATCH_DURATION_SECONDS", 300, 1, 3600),
+    duration: numberEnv(
+      "MATCH_DURATION_SECONDS",
+      DEFAULT_MATCH_DURATION_SECONDS,
+      1,
+      3600,
+    ),
     maxTeamSize: numberEnv("MAX_TEAM_SIZE", 6, 1, 6),
     grace: numberEnv("RECONNECT_GRACE_SECONDS", 20, 5, 120),
     dev: !production,

@@ -11,7 +11,7 @@ const escape = (s: string) =>
 export function reorgView(state: Snapshot, localId: string | null) {
   const local = state.players.find((p) => p.id === localId);
   return `<div class="reorg-intro"><span class="eyebrow">A MESSAGE FROM THE ORGANIZATION</span><div class="reorg-symbol"><svg width="110" height="65" viewBox="0 0 110 65" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path stroke="#88d8ff" d="M12 18H98M81 5l17 13-17 13"/><path stroke="#ffc38a" d="M98 47H12m17-13L12 47l17 13"/></svg></div><strong>REORG!</strong><p>The org chart just changed.</p></div>
- <section class="reorg-board"><div class="reorg-heading"><span class="eyebrow">THE REORG HAS HIT</span><h2>MEET YOUR NEW TEAM</h2><p>Two minutes. A whole new org chart.</p></div>
+ <section class="reorg-board"><div class="reorg-heading"><span class="eyebrow">THE REORG HAS HIT</span><h2>MEET YOUR NEW TEAM</h2><p>One minute. A whole new org chart.</p></div>
  ${local ? `<div class="reorg-local ${local.team.toLowerCase()}" role="status" aria-live="assertive">YOUR NEW TEAM <strong>${local.team}</strong></div>` : ""}
  <div class="reorg-teams">${TEAMS.map(
    (team) =>

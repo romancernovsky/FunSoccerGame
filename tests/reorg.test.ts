@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Game } from "../server/game";
 import { REORG, TEAMS } from "../src/shared";
 const now = 100000;
-function match(leaders = 6, workers = 6, duration = 300) {
+function match(leaders = 6, workers = 6, duration = 180) {
   const g = new Game({ duration, maxTeamSize: 6, grace: 20, dev: true }),
     identities = [];
   for (const [team, n] of [
@@ -17,23 +17,23 @@ function match(leaders = 6, workers = 6, duration = 300) {
   return { g, identities };
 }
 function trigger(g: Game, t = now + 5000) {
-  g.remaining = 120.01;
+  g.remaining = 60.01;
   g.tick(0.02, t);
 }
-test("Reorg triggers once at exactly 02:00, freezes clock and physics, preserves score", () => {
+test("Reorg triggers once at exactly 01:00, freezes clock and physics, preserves score", () => {
   const { g } = match();
   g.score = { LEADERS: 2, WORKERS: 3 };
   g.ball.vx = 700;
   trigger(g);
   assert.equal(g.phase, "REORG");
-  assert.equal(g.remaining, 120);
+  assert.equal(g.remaining, 60);
   assert.deepEqual(g.score, { LEADERS: 2, WORKERS: 3 });
   assert.equal(g.ball.x, 600);
   assert.equal(g.ball.vx, 0);
   assert.equal(g.ball.owner, null);
   const positions = [...g.players.values()].map((p) => [p.x, p.y]);
   g.tick(4, now + 6000);
-  assert.equal(g.remaining, 120);
+  assert.equal(g.remaining, 60);
   assert.deepEqual(
     [...g.players.values()].map((p) => [p.x, p.y]),
     positions,
@@ -41,13 +41,13 @@ test("Reorg triggers once at exactly 02:00, freezes clock and physics, preserves
   assert.equal(g.reorgDone, true);
   g.tick(0, now + 5000 + REORG.revealSeconds * 1000);
   assert.equal(g.phase, "KICKOFF_COUNTDOWN");
-  assert.equal(g.remaining, 120);
+  assert.equal(g.remaining, 60);
   g.tick(0, g.deadline);
   assert.equal(g.phase, "PLAYING");
   g.tick(0.1, g.deadline + 100);
-  assert.ok(g.remaining < 120);
+  assert.ok(g.remaining < 60);
   assert.equal(g.reorg?.assignments.length, 12);
-  g.remaining = 121;
+  g.remaining = 61;
   g.tick(2, g.deadline + 200);
   assert.equal(g.phase, "PLAYING");
 });
@@ -133,7 +133,7 @@ test("host pause and resume preserve the remaining reveal time and cannot retrig
   g.command("pause", {}, now + 8000);
   assert.equal(g.phase, "PAUSED");
   g.tick(10, now + 18000);
-  assert.equal(g.remaining, 120);
+  assert.equal(g.remaining, 60);
   g.command("resume", {}, now + 18000);
   assert.equal(g.phase, "REORG");
   assert.equal(g.deadline, now + 27000);
@@ -173,7 +173,7 @@ test("new matches, restarts and rematches reset the surprise; Golden Goal and sh
   g.command("restart", { confirm: true }, now + 6000);
   assert.equal(g.reorgDone, false);
   assert.equal(g.reorg, null);
-  assert.equal(g.remaining, 300);
+  assert.equal(g.remaining, 180);
   g.tick(0, g.deadline);
   trigger(g, now + 12000);
   g.command("end", { confirm: true }, now + 13000);
@@ -184,15 +184,48 @@ test("new matches, restarts and rematches reset the surprise; Golden Goal and sh
   g.command("new", {}, now + 16000);
   assert.equal(g.reorg, null);
   assert.equal(g.players.size, 0);
-  const short = match(1, 1, 120).g;
+  const short = match(1, 1, 60).g;
   short.tick(0.1, now + 5000);
   assert.equal(short.phase, "PLAYING");
   assert.equal(short.reorg, null);
   const golden = match(1, 1).g;
   golden.phase = "GOLDEN_GOAL";
   golden.golden = true;
-  golden.remaining = 121;
+  golden.remaining = 61;
   golden.tick(2, now + 5000);
   assert.equal(golden.phase, "GOLDEN_GOAL");
   assert.equal(golden.reorg, null);
+});
+
+test("default regulation is three minutes and Reorg leaves one full minute of active play", () => {
+  const events: string[] = [];
+  const g = new Game(undefined, (kind) => events.push(kind));
+  assert.equal(g.remaining, 180);
+  g.join("Alex", "LEADERS", now);
+  g.join("Sam", "WORKERS", now);
+  g.command("start", { confirm: true }, now);
+  g.tick(0, g.deadline);
+  for (let i = 1; i <= 119; i++) g.tick(1, now + 4000 + i * 1000);
+  assert.equal(g.phase, "PLAYING");
+  assert.equal(g.remaining, 61);
+  g.tick(1, now + 124000);
+  assert.equal(g.phase, "REORG");
+  assert.equal(g.remaining, 60);
+  assert.equal(events.filter((e) => e === "final_minute").length, 0);
+  g.tick(0, g.deadline);
+  assert.equal(g.phase, "KICKOFF_COUNTDOWN");
+  assert.equal(g.remaining, 60);
+  g.tick(0, g.deadline);
+  assert.equal(g.phase, "PLAYING");
+  assert.equal(g.remaining, 60);
+  const resumedAt = g.deadline;
+  g.tick(1, resumedAt + 1000);
+  assert.equal(g.remaining, 59);
+  assert.equal(events.filter((e) => e === "final_minute").length, 1);
+  g.score.LEADERS = 1;
+  for (let i = 2; i <= 60; i++) g.tick(1, resumedAt + i * 1000);
+  assert.equal(g.phase, "FINISHED");
+  assert.equal(g.remaining, 0);
+  assert.equal(events.filter((e) => e === "reorg_started").length, 1);
+  assert.equal(events.filter((e) => e === "final_minute").length, 1);
 });

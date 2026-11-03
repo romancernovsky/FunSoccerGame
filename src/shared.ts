@@ -1,3 +1,5 @@
+export const DEFAULT_MATCH_DURATION_SECONDS = 180;
+
 export type Team = "LEADERS" | "WORKERS";
 export type Phase =
   | "WAITING"
@@ -53,7 +55,7 @@ export type ReorgAssignment = {
 };
 export type Reorg = { id: number; assignments: ReorgAssignment[] };
 export const REORG = {
-  remaining: 120,
+  remaining: 60,
   revealSeconds: 12,
   introSeconds: 2,
   kickoffSeconds: 3,

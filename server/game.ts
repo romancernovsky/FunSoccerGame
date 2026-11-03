@@ -1,6 +1,7 @@
 import { Predictions } from "./predictions.js";
 import { randomBytes, randomInt } from "node:crypto";
 import {
+  DEFAULT_MATCH_DURATION_SECONDS,
   FIELD as F,
   REORG,
   type Reorg,
@@ -27,6 +28,7 @@ export class Game {
   celebration: Celebration | null = null;
   reorg: Reorg | null = null;
   reorgDone = false;
+  finalMinuteAnnounced = false;
   golden = false;
   ended = false;
   event = { id: 0, kind: "ready" };
@@ -37,7 +39,12 @@ export class Game {
   passFrom: string | null = null;
   nextId = 0;
   constructor(
-    public config = { duration: 300, maxTeamSize: 6, grace: 20, dev: false },
+    public config = {
+      duration: DEFAULT_MATCH_DURATION_SECONDS,
+      maxTeamSize: 6,
+      grace: 20,
+      dev: false,
+    },
     public log: (kind: string, data?: unknown) => void = () => {},
   ) {
     this.remaining = config.duration;
@@ -289,6 +296,7 @@ export class Game {
     this.celebration = null;
     this.reorg = null;
     this.reorgDone = false;
+    this.finalMinuteAnnounced = false;
     this.passes = 0;
     this.passFrom = null;
     this.possessionTeam = null;
@@ -538,7 +546,12 @@ export class Game {
         this.beginReorg(now);
         return;
       }
-      if (before > 60 && this.remaining <= 60) this.emit("final_minute");
+      // At 01:00 the Reorg takes priority; announce the final minute on the
+      // first active tick after its kickoff, without losing the sound cue.
+      if (!this.finalMinuteAnnounced && this.remaining <= 60) {
+        this.finalMinuteAnnounced = true;
+        this.emit("final_minute");
+      }
       if (this.remaining === 0) {
         if (this.score.LEADERS === this.score.WORKERS) {
           this.golden = true;

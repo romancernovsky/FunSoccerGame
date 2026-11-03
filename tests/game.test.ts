@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Game } from "../server/game";
 const now = 100000;
 const game = () =>
-  new Game({ duration: 300, maxTeamSize: 6, grace: 20, dev: true });
+  new Game({ duration: 180, maxTeamSize: 6, grace: 20, dev: true });
 function pair(g = game()) {
   const a = g.join("Alex", "LEADERS", now),
     b = g.join("Sam", "WORKERS", now);
@@ -68,15 +68,15 @@ test("server countdown, timer and pause freeze simulation", () => {
   const { g, a } = playing();
   g.input(a.id, { x: 1, y: 0, action: false, dash: false }, now + 4000);
   g.tick(0.1, now + 4100);
-  assert.equal(g.remaining, 299.9);
+  assert.equal(g.remaining, g.config.duration - 0.1);
   const x = g.players.get(a.id)!.x;
   g.command("pause", {}, now + 4100);
   g.tick(5, now + 9100);
-  assert.equal(g.remaining, 299.9);
+  assert.equal(g.remaining, g.config.duration - 0.1);
   assert.equal(g.players.get(a.id)!.x, x);
   g.command("resume", {}, now + 9100);
   g.tick(0.1, now + 9200);
-  assert.ok(Math.abs(g.remaining - 299.8) < 0.0001);
+  assert.ok(Math.abs(g.remaining - (g.config.duration - 0.2)) < 0.0001);
 });
 test("goals require entire ball to cross within opening; celebration freezes clock", () => {
   const { g } = playing();
@@ -152,7 +152,7 @@ test("rematch keeps names and roles, new match clears them", () => {
   assert.equal(g.players.size, 2);
   assert.equal(g.players.get(a.id)!.keeper, true);
   assert.equal(g.score.LEADERS, 0);
-  assert.equal(g.remaining, 300);
+  assert.equal(g.remaining, 180);
   g.command("end", { confirm: true }, now);
   g.command("new", {}, now);
   assert.equal(g.players.size, 0);

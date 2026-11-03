@@ -57,3 +57,7 @@ The final independent critic approved **8.7/10 ball visibility** and **8.5/10 pl
 Fullscreen is now feature-detected. Unsupported or rejected native requests show honest help instead of a fake successful fullscreen state. The Safari guide supports Share → Add to Home Screen, launching before joining, the session-transfer caveat, and an always-visible 44 px close control. A standalone manifest, original icons and Apple web-app metadata provide the Home Screen route; no service worker/offline cache is installed. Native desktop fullscreen remains supported.
 
 The critic's approval concerns screenshot-observable UI and accurate guidance. Physical iPhone installation/launch, actual browser chrome removal, safe areas and thumb comfort remain unverified in this Linux environment. Browser checks use Chromium with iPhone user-agent and capability emulation; they exercise unavailable/rejected APIs, simulated standalone detection, short-viewport controls and keyboard isolation while help is open. They must not be described as a physical Safari test.
+
+## Match timing update
+
+Default regulation is now three minutes (180 seconds), with Reorg at **01:00** remaining. The reveal and kickoff still pause the match clock, leaving one full minute of active play afterward. The final-minute cue is announced when play resumes. The accelerated Reorg browser check now uses a 66-second match to reach the event after six seconds; earlier 02:00 screenshots above describe the historical timing.
