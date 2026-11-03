@@ -58,6 +58,23 @@ export const REORG = {
   introSeconds: 2,
   kickoffSeconds: 3,
 } as const;
+export type PredictionSummary = {
+  roundId: string;
+  open: boolean;
+  totals: Record<Team, number>;
+  total: number;
+  outcome: "PENDING" | "SETTLED" | "VOID";
+  winner: Team | null;
+};
+export type AudienceState = {
+  now: number;
+  phase: Phase;
+  remaining: number;
+  golden: boolean;
+  score: Record<Team, number>;
+  predictions: PredictionSummary;
+  pick: Team | null;
+};
 export type Snapshot = {
   now: number;
   phase: Phase;
@@ -70,6 +87,7 @@ export type Snapshot = {
   reorg: Reorg | null;
   golden: boolean;
   ended: boolean;
+  predictions: PredictionSummary;
   maxTeamSize: number;
   dev: boolean;
   event: { id: number; kind: string };

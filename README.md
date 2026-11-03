@@ -131,3 +131,19 @@ npm run test:reorg
 ```
 
 The dedicated browser check starts an isolated 126-second development match, so the event arrives after six seconds of actual play. It verifies the 1v1 team swap, orange-to-blue 3D kit change, locked clock/controls, pause and player refresh during the reveal, synchronized kickoff, and movement after play resumes. Reorg screenshots are in `artifacts/reorg/`. The capture helper uses only isolated TEST participants and holds genuine REORG snapshots during still capture; it does not inject assignments or scores.
+
+## Audience predictions
+
+People who are not playing can open **`/predict`**, or choose **Predict the winner** from `/join`. The projector QR still opens `/join`, which offers both play and prediction paths. Both teams can fill up without starting the match; JOIN GAME is disabled when all twelve slots are taken, while audience predictions remain available. Audience picks never take a player slot or start the match.
+
+Each audience browser chooses LEADERS or WORKERS and can change its pick while the lobby is open. The server locks all picks as soon as the host successfully starts the countdown. Failed start attempts leave them open. Late visitors see the crowd split and live score; their next chance to pick is a new prediction lobby. This is a no-money prediction poll with no accounts, odds, stakes, purchases or payouts.
+
+The host and projector show the crowd split. Broadcast mode keeps a compact audience badge on the field. Audience phones show a live score, official clock updates, match status and their saved pick. When a match finishes normally, the winning team determines the prediction result, including Golden Goal; correct predictors see **YOU CALLED IT!**. Host-ended matches produce no prediction winners. The Reorg changes player assignments; predictions remain attached to the team names LEADERS and WORKERS.
+
+**Rematch lobby** keeps players, team assignments and goalkeeper roles, resets the score, clears previous picks and opens predictions again. The host presses START MATCH when ready. The existing quick **Rematch** and **Restart match** keep the current locked team picks; **New Match** and **Reset lobby** clear all picks along with players. No flow starts a match because teams or predictions fill up.
+
+A temporary HttpOnly, SameSite cookie keeps one pick per browser across refreshes and tabs. Separate browsers/devices count separately; clearing cookies creates a fresh audience identity. All choices exist only in server memory, bounded at 5,000 audience identities, and disappear on instance replacement or a new prediction round. Individual choices and identity cookies are never broadcast to other viewers.
+
+Audience phones poll a small `/api/audience` JSON summary every two seconds (ten seconds while hidden). They do not create player WebSocket connections, download position snapshots or run the 3D render loop. They therefore do not consume the game's 64 realtime connection slots. The usual Cloud Run instance memory, request concurrency and CPU limits still apply; rehearse at the expected meeting audience size.
+
+Prediction tests cover full-team lobbies, replacement/idempotence, validation/rate limits, host-start locking, Reorg, Golden Goal, host-ended results, reset/rematch behavior and bounded memory. HTTP integration tests exercise cookies, refresh identity, payload/origin validation and server-side locking. The mobile browser flow covers entry from a full lobby, picks and changes, refresh, shared totals, locking and rematch lobby reset.

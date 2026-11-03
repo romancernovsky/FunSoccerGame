@@ -3127,3 +3127,344 @@ body {
     border-radius: 0 0 10px 10px;
   }
 }
+
+/* The audience gets a seat in the game, even when the pitch is full. */
+.audience-entry,
+.crowd-card {
+  border: 1px solid #a9d8ed30;
+  background: linear-gradient(120deg, #193346dc, #102735e8);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin: 18px 0;
+}
+.audience-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 0;
+}
+.audience-entry h2 {
+  font-size: 30px;
+  margin: 5px 0;
+}
+.audience-entry p {
+  color: #aac7d4;
+  font-size: 12px;
+}
+.audience-entry .primary {
+  white-space: nowrap;
+}
+.crowd-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.crowd-heading > strong {
+  color: #f0f7df;
+  font-size: 13px;
+}
+.crowd-lock {
+  margin-left: auto;
+  color: #b7cdd6;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.crowd-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 18px 0 10px;
+}
+.crowd-labels > span {
+  color: #96d7ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.crowd-labels > span:last-child {
+  text-align: right;
+  color: #ffbc89;
+}
+.crowd-labels b {
+  margin-left: 8px;
+  font-size: 18px;
+}
+.crowd-labels small {
+  display: block;
+  color: #a2b8c3;
+  font-size: 10px;
+  margin-top: 4px;
+  font-weight: 400;
+}
+.crowd-track {
+  height: 10px;
+  border-radius: 6px;
+  background: #f7aa70;
+  overflow: hidden;
+}
+.crowd-track i {
+  height: 100%;
+  display: block;
+  background: #72b2f0;
+}
+.crowd-track.empty {
+  opacity: 0.25;
+}
+.crowd-result {
+  color: #dbf995;
+  margin-top: 15px;
+  font-size: 13px;
+}
+.broadcast-view main > .crowd-card {
+  display: none;
+}
+.audience-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 24px 28px;
+}
+.audience-main > h1 {
+  font-size: clamp(44px, 8vw, 76px);
+  line-height: 0.98;
+  margin: 14px 0 20px;
+}
+.audience-main > h1 em {
+  color: #dafa95;
+  font-style: italic;
+}
+.audience-intro {
+  max-width: 550px;
+  color: #b1c9d5;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.audience-header {
+  height: 85px;
+}
+.audience-header .text-link {
+  font-size: 11px;
+}
+.audience-match {
+  margin: 25px 0;
+  border: 1px solid #a9d8ed30;
+  border-radius: 12px;
+  padding: 20px;
+  background: #0b2131;
+  text-align: center;
+}
+.audience-status {
+  color: #dafa95;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+.audience-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 4px;
+}
+.audience-score > span {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(20px, 4vw, 30px);
+  font-weight: 700;
+  color: #92d1ff;
+}
+.audience-score > span:last-child {
+  color: #ffb57f;
+}
+.audience-score strong {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 42px;
+  font-family: "Barlow Condensed", sans-serif;
+}
+.audience-score i {
+  color: #68808e;
+  font-style: normal;
+  font-size: 24px;
+}
+.audience-clock {
+  color: #c6d8df;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.prediction-pick > .eyebrow {
+  color: #dafa95;
+  margin: 26px 0 14px;
+}
+.prediction-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.prediction-option {
+  border: 2px solid #72b2f044;
+  background: linear-gradient(145deg, #24455d, #132d40);
+  color: #9ed7ff;
+  min-height: 165px;
+  border-radius: 12px;
+  padding: 18px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  touch-action: manipulation;
+}
+.prediction-option.workers {
+  color: #ffc698;
+  background: linear-gradient(145deg, #533c30, #302a29);
+  border-color: #f7aa7044;
+}
+.prediction-option > span {
+  font-size: 30px;
+}
+.prediction-option strong {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 800;
+}
+.prediction-option small {
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.prediction-option.is-picked {
+  border-color: #dbf995;
+  box-shadow:
+    0 0 0 3px #dbf99515,
+    0 0 35px #dbf9950e;
+}
+.prediction-option:disabled {
+  opacity: 0.62;
+}
+.prediction-option.is-picked:disabled {
+  opacity: 1;
+}
+.prediction-note,
+.prediction-fineprint {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #a5bdc7;
+  margin: 14px 0;
+}
+.prediction-error {
+  color: #ffbf9f;
+  font-size: 12px;
+  line-height: 1.6;
+  min-height: 16px;
+}
+.audience-connection {
+  text-align: center;
+  color: #b3d69a;
+  font-size: 9px;
+  letter-spacing: 1px;
+  margin-top: 24px;
+}
+.prediction-fineprint {
+  text-align: center;
+  color: #7f9aa8;
+}
+@media (max-width: 760px) {
+  .audience-entry {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+  }
+  .audience-entry h2 {
+    font-size: 26px;
+  }
+  .audience-entry .primary {
+    text-align: center;
+  }
+  .audience-header {
+    height: 76px;
+    padding: 0 20px;
+  }
+  .audience-header .brand {
+    font-size: 16px;
+  }
+  .audience-header .brand small {
+    font-size: 6px;
+  }
+  .audience-header .brand-icon {
+    display: none;
+  }
+  .audience-main {
+    padding: 30px 20px;
+  }
+  .crowd-card {
+    padding: 18px;
+  }
+  .crowd-heading {
+    gap: 8px;
+  }
+  .crowd-lock {
+    flex-basis: 100%;
+    margin: 3px 0 0;
+  }
+  .crowd-labels > span {
+    font-size: 11px;
+  }
+}
+
+.crowd-live {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 3;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border: 1px solid #b2dcef30;
+  border-radius: 6px;
+  background: #0a2032e8;
+  font-size: 9px;
+  pointer-events: none;
+}
+.crowd-live span {
+  color: #a6c4d1;
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+.crowd-live b {
+  color: #92d1ff;
+}
+.crowd-live b:last-child {
+  color: #ffb57f;
+}
+.audience-final {
+  color: #dbf995;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-top: 14px;
+}
+@media (max-width: 760px) {
+  .crowd-live {
+    font-size: 7px;
+    gap: 8px;
+    padding: 6px 8px;
+  }
+  .crowd-live span {
+    display: none;
+  }
+}
+
+.prediction-option svg {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+.audience-entry .primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}

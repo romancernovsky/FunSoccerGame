@@ -1,3 +1,5 @@
+import { startAudience } from "./audience";
+import { predictionSummary } from "./prediction-view";
 import { reorgView } from "./reorg-view";
 import "@fontsource/barlow-condensed/latin-600.css";
 import "@fontsource/barlow-condensed/latin-700.css";
@@ -154,7 +156,7 @@ function connect() {
   ws.onerror = () => ws?.close();
 }
 function header() {
-  return `<header><a class="brand" href="/"><span class="brand-icon">✦</span><span>OFFICE<span class="brand-light"> / </span>ARENA<small>LEADERS VS WORKERS</small></span></a><nav><a class="${!host && !join ? "current" : ""}" href="/screen">Spectator</a><a class="${join ? "current" : ""}" href="/join">Join game <span>↗</span></a>${host ? '<a class="current" href="/host">Host console</a>' : ""}</nav><div class="connection"><i class="${connected ? "" : "offline"}"></i>${connected ? "LIVE CONNECTION" : "RECONNECTING"}</div></header>`;
+  return `<header><a class="brand" href="/"><span class="brand-icon">✦</span><span>OFFICE<span class="brand-light"> / </span>ARENA<small>LEADERS VS WORKERS</small></span></a><nav><a class="${!host && !join ? "current" : ""}" href="/screen">Spectator</a><a class="${join ? "current" : ""}" href="/join">Join game <span>↗</span></a><a href="/predict">Predict the winner</a>${host ? '<a class="current" href="/host">Host console</a>' : ""}</nav><div class="connection"><i class="${connected ? "" : "offline"}"></i>${connected ? "LIVE CONNECTION" : "RECONNECTING"}</div></header>`;
 }
 function teamCard(team: Team, manage = false) {
   const ps = state?.players.filter((p) => p.team === team) ?? [];
@@ -171,13 +173,17 @@ function teamCard(team: Team, manage = false) {
   )}</div><div class="team-footer">${ps.length === (state?.maxTeamSize ?? 6) ? "TEAM FULL" : "OPEN FOR BUSINESS"}<span>${ps.filter((p) => p.connected).length} connected</span></div></section>`;
 }
 function qrCard() {
-  return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to join the match</strong><a class="join-link" href="/join">${esc(location.host)}/join ↗</a><div class="quick-facts"><span>◷ 5 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
+  return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to play or predict</strong><a class="join-link" href="/join">${esc(location.host)}/join ↗</a><div class="quick-facts"><span>◷ 5 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
 }
 function scoreboard() {
   return `<div class="scoreboard"><div class="score-team blue"><span>${arrow}</span> LEADERS</div><div class="score"><b id="score-l">${state?.score.LEADERS ?? 0}</b><span>:</span><b id="score-w">${state?.score.WORKERS ?? 0}</b></div><div class="score-team orange">WORKERS <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
 }
 function arena() {
-  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><span class="pitch-label">OFFICE ARENA / ${state?.phase === "WAITING" ? "PRE-MATCH" : "LIVE MATCH"}</span><span class="pitch-watermark">EASY TO PLAY. FUN TO WATCH.</span></div>`;
+  const predictions = state?.predictions;
+  const leaders = predictions?.total
+    ? Math.round((predictions.totals.LEADERS / predictions.total) * 100)
+    : 0;
+  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><span class="pitch-label">OFFICE ARENA / ${state?.phase === "WAITING" ? "PRE-MATCH" : "LIVE MATCH"}</span><span class="pitch-watermark">EASY TO PLAY. FUN TO WATCH.</span>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>AUDIENCE PICKS</span><b>${leaders}% LEADERS</b><b>${100 - leaders}% WORKERS</b></div>` : ""}</div>`;
 }
 function controls() {
   return `<div class="mobile-identity"><i></i><span>${esc(me()?.name ?? "")}<small>YOU · ${me()?.team ?? ""}</small></span></div><div id="possession-hint" class="possession-hint"></div><div class="mobile-controls"><div id="joystick" class="joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash">↯<small>DASH</small></button><button id="shoot" class="shoot">◉<small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>The whole pitch looks better in landscape.</p></div>`;
@@ -258,7 +264,7 @@ function watchToolbar() {
 function hostPanel() {
   if (!hostReady)
     return `<section class="pin-panel"><span class="eyebrow">MATCH CONTROL</span><h1>Connecting to the control room…</h1><p>Your host console will open automatically.</p><div id="error" role="alert">${esc(error)}</div></section>`;
-  return `<div class="section-top host-console-heading"><div><span class="eyebrow">THE CONTROL ROOM</span><h1>Run the show<span class="accent">.</span></h1></div><a class="text-link" href="/screen" target="_blank">Open projector ↗</a></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("LEADERS") !== count("WORKERS") ? "⚠ Teams are uneven. The host decides when to start." : "Ready when you are. The match never starts automatically.") : `${state?.phase.replaceAll("_", " ")} · Official server timer`}</p><div id="error" role="alert">${esc(error)}</div><div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
+  return `<div class="section-top host-console-heading"><div><span class="eyebrow">THE CONTROL ROOM</span><h1>Run the show<span class="accent">.</span></h1></div><a class="text-link" href="/screen" target="_blank">Open projector ↗</a></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="rematch_lobby" title="Keep teams and reopen audience predictions; start manually">REMATCH LOBBY</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("LEADERS") !== count("WORKERS") ? "⚠ Teams are uneven. The host decides when to start." : "Ready when you are. The match never starts automatically.") : `${state?.phase.replaceAll("_", " ")} · Official server timer`}</p><div id="error" role="alert">${esc(error)}</div>${state ? predictionSummary(state.predictions) : ""}<div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
 }
 function joinPanel() {
   const p = me();
@@ -268,13 +274,13 @@ function joinPanel() {
     return `<div class="waiting-layout"><section class="joined-card"><div class="check-mark">✓</div><span class="eyebrow">YOU ARE IN</span><h1>TEAM<br><span class="${p.team === "LEADERS" ? "blue" : "orange"}">${p.team}</span></h1><p>Welcome, <strong>${esc(p.name)}</strong>.<br>Get your game face on.</p><div class="waiting-pill"><i></i>Waiting for host…</div><div class="how-to"><span><b>↔</b>MOVE<small>Joystick / WASD</small></span><span><b>◉</b>PASS<small>Tap</small></span><span><b>↗</b>SHOOT<small>Hold & release</small></span><span><b>ϟ</b>DASH<small>Button / Shift</small></span></div></section>${teamCard(p.team)}</div>`;
   }
   if (active())
-    return `<section class="pin-panel"><span class="eyebrow">THE PITCH IS BUSY</span><h1>Match in progress<span class="accent">.</span></h1><p>Please wait for the next game.</p><a class="primary" href="/screen">WATCH THE MATCH ↗</a></section>`;
-  return `<div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br>Make some<br><em>noise.</em></h1><p>The five-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected ? "disabled" : ""}>JOIN GAME <span>↗</span></button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
+    return `<section class="pin-panel"><span class="eyebrow">THE PITCH IS BUSY</span><h1>Match in progress<span class="accent">.</span></h1><p>Please wait for the next game.</p><a class="primary" href="/predict">FOLLOW AUDIENCE PICKS ↗</a><a class="text-link" href="/screen">Watch the match ↗</a></section>`;
+  return `<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br>Make some<br><em>noise.</em></h1><p>The five-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME <span>↗</span></button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
 }
 function spectator() {
   if (active())
-    return `<div class="match-heading"><span class="eyebrow"><i class="live-dot"></i> ${state?.golden ? "GOLDEN GOAL" : "LIVE FROM THE OFFICE ARENA"}</span><button class="secondary compact" id="fullscreen">⛶ Full screen</button></div>${scoreboard()}${arena()}<div class="match-bottom"><span><i class="live-dot"></i> ${state?.players.filter((p) => p.connected).length} PLAYERS ON THE PITCH</span><span>BIG IDEAS. BIGGER GOALS.</span></div>`;
-  return `<div class="section-top"><div><span class="eyebrow"><i class="live-dot"></i> THE ALL-HANDS SHOWDOWN</span><h1>Business as <em>unusual.</em></h1><p>The meeting can wait. The match is almost on.</p></div><div class="lobby-status"><span class="status-pill">PRE-MATCH LOBBY</span><strong>${count("LEADERS") + count("WORKERS")} <span>/ ${(state?.maxTeamSize ?? 6) * 2} PLAYERS JOINED</span></strong><small>Waiting for host to start</small></div></div><div class="lobby-layout"><div class="lobby-main">${scoreboard()}${arena()}<div class="teams-grid">${TEAMS.map((t) => teamCard(t)).join("")}</div></div>${qrCard()}</div><div class="rules-strip"><span><b>01</b> SCAN & PICK A TEAM</span><i>→</i><span><b>02</b> WAIT FOR THE WHISTLE</span><i>→</i><span><b>03</b> GIVE THE OFFICE SOMETHING TO TALK ABOUT</span></div>`;
+    return `<div class="match-heading"><span class="eyebrow"><i class="live-dot"></i> ${state?.golden ? "GOLDEN GOAL" : "LIVE FROM THE OFFICE ARENA"}</span><button class="secondary compact" id="fullscreen">⛶ Full screen</button></div>${scoreboard()}${arena()}${state ? predictionSummary(state.predictions) : ""}<div class="match-bottom"><span><i class="live-dot"></i> ${state?.players.filter((p) => p.connected).length} PLAYERS ON THE PITCH</span><span>BIG IDEAS. BIGGER GOALS.</span></div>`;
+  return `<div class="section-top"><div><span class="eyebrow"><i class="live-dot"></i> THE ALL-HANDS SHOWDOWN</span><h1>Business as <em>unusual.</em></h1><p>The meeting can wait. The match is almost on.</p></div><div class="lobby-status"><span class="status-pill">PRE-MATCH LOBBY</span><strong>${count("LEADERS") + count("WORKERS")} <span>/ ${(state?.maxTeamSize ?? 6) * 2} PLAYERS JOINED</span></strong><small>Waiting for host to start</small></div></div><div class="lobby-layout"><div class="lobby-main">${scoreboard()}${arena()}<div class="teams-grid">${TEAMS.map((t) => teamCard(t)).join("")}</div></div>${qrCard()}</div>${state ? predictionSummary(state.predictions) : ""}<div class="rules-strip"><span><b>01</b> SCAN & PICK A TEAM</span><i>→</i><span><b>02</b> WAIT FOR THE WHISTLE</span><i>→</i><span><b>03</b> GIVE THE OFFICE SOMETHING TO TALK ABOUT</span></div>`;
 }
 function render() {
   if (!state) return;
@@ -294,6 +300,7 @@ function render() {
     state.dev,
     broadcast,
     playerFullscreen,
+    state.predictions,
     followCamera,
   ]);
   if (sig !== signature) {
@@ -784,11 +791,12 @@ function draw(time: number) {
     drawConfetti(ctx, time);
   }
   if (phase === "FINISHED") {
-    const winner =
-      state.score.LEADERS === state.score.WORKERS
+    const winner = state.ended
+      ? "THANKS FOR PLAYING"
+      : state.score.LEADERS === state.score.WORKERS
         ? "A MATCH TO REMEMBER"
         : `${state.score.LEADERS > state.score.WORKERS ? "LEADERS" : "WORKERS"} WIN!`;
-    html = `<span class="eyebrow">${state.ended ? "MATCH ENDED BY HOST" : "FULL TIME"}</span><strong>${state.score.LEADERS} — ${state.score.WORKERS}</strong><h2>🏆 ${winner}</h2><p>Same office. New bragging rights.</p>`;
+    html = `<span class="eyebrow">${state.ended ? "MATCH ENDED BY HOST" : "FULL TIME"}</span><strong>${state.score.LEADERS} — ${state.score.WORKERS}</strong><h2>${state.ended ? "" : "🏆 "}${winner}</h2><p>Same office. New bragging rights.</p>${!join && state.predictions.winner && state.predictions.total ? `<div class="audience-final">${state.predictions.totals[state.predictions.winner]} OF ${state.predictions.total} AUDIENCE MEMBERS CALLED IT!</div>` : ""}`;
     drawConfetti(ctx, time);
   }
   if (phase === "GOLDEN_GOAL")
@@ -910,5 +918,8 @@ function drawConfetti(c: CanvasRenderingContext2D, t: number) {
 app.innerHTML =
   header() +
   '<main class="loading"><span class="eyebrow">OFFICE ARENA</span><h1>Warming up the pitch…</h1></main>';
-connect();
-requestAnimationFrame(draw);
+if (route === "/predict") startAudience(app);
+else {
+  connect();
+  requestAnimationFrame(draw);
+}

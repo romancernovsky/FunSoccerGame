@@ -1,3 +1,4 @@
+import { Predictions } from "./predictions.js";
 import { randomBytes, randomInt } from "node:crypto";
 import {
   FIELD as F,
@@ -15,6 +16,7 @@ import {
 const blank = (): Input => ({ x: 0, y: 0, action: false, dash: false });
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export class Game {
+  predictions = new Predictions();
   players = new Map<string, Player>();
   sessions = new Map<string, string>();
   phase: Phase = "WAITING";
@@ -197,6 +199,7 @@ export class Game {
       case "new":
         if (action === "new" && this.phase !== "FINISHED")
           throw Error("Finish the match first.");
+        this.predictions.reset();
         this.players.clear();
         this.sessions.clear();
         this.reset();
@@ -237,6 +240,13 @@ export class Game {
         if (data.confirm !== true) throw Error("Confirmation required.");
         this.checkStart(true);
         this.start(now);
+        break;
+      case "rematch_lobby":
+        if (this.phase !== "FINISHED") throw Error("Finish the match first.");
+        this.reset();
+        this.predictions.reset();
+        this.phase = "WAITING";
+        this.emit("rematch_lobby_opened");
         break;
       case "rematch":
         if (this.phase !== "FINISHED") throw Error("Finish the match first.");
@@ -285,6 +295,7 @@ export class Game {
     this.positionPlayers();
   }
   start(now: number) {
+    this.predictions.locked = true;
     this.reset();
     this.phase = "COUNTDOWN";
     this.deadline = now + 4000;
@@ -758,6 +769,7 @@ export class Game {
       reorg: this.reorg,
       golden: this.golden,
       ended: this.ended,
+      predictions: this.predictions.summary(this.phase, this.score, this.ended),
       maxTeamSize: this.config.maxTeamSize,
       dev: this.config.dev,
       event: this.event,

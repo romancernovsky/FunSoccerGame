@@ -109,6 +109,67 @@ test(
           .message,
         /disabled in production/,
       );
+      const audience = await fetch("http://127.0.0.1:3102/api/audience");
+      assert.equal(audience.headers.get("cache-control"), "no-store");
+      assert.match(audience.headers.get("set-cookie")!, /HttpOnly/);
+      const cookie = audience.headers.get("set-cookie")!.split(";")[0];
+      const before = (await audience.json()) as any;
+      assert.equal(before.players, undefined);
+      assert.equal(before.pick, null);
+      const pick = (team: unknown, extra = {}, headers = {}) =>
+        fetch("http://127.0.0.1:3102/api/audience", {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie, ...headers },
+          body: JSON.stringify({
+            team,
+            roundId: before.predictions.roundId,
+            ...extra,
+          }),
+        });
+      assert.equal((await fetch("http://127.0.0.1:3102/predict")).status, 200);
+      assert.equal((await pick("LEADERS")).status, 200);
+      const repeated = (await (await pick("LEADERS")).json()) as any;
+      assert.equal(repeated.predictions.total, 1);
+      assert.equal(repeated.pick, "LEADERS");
+      assert.equal((await pick("INVALID")).status, 400);
+      assert.equal((await pick("WORKERS")).status, 200);
+      assert.equal(
+        (await pick("LEADERS", {}, { origin: "https://elsewhere.example" }))
+          .status,
+        403,
+      );
+      assert.equal(
+        (await pick("LEADERS", { text: "x".repeat(1000) })).status,
+        413,
+      );
+      const recovered = (await (
+        await fetch("http://127.0.0.1:3102/api/audience", {
+          headers: { cookie },
+        })
+      ).json()) as any;
+      assert.equal(recovered.pick, "WORKERS");
+      // A failed start leaves predictions open; a successful start locks HTTP writes too.
+      assert.match(
+        (await request("command", { action: "start", confirm: true }, "error"))
+          .message,
+        /Both teams/,
+      );
+      assert.equal(
+        (
+          (await (
+            await fetch("http://127.0.0.1:3102/api/audience")
+          ).json()) as any
+        ).predictions.open,
+        true,
+      );
+      await request(
+        "join",
+        { name: "Sam", team: "WORKERS" },
+        "identity",
+        refreshedHost,
+      );
+      await request("command", { action: "start", confirm: true }, "state");
+      assert.equal((await pick("LEADERS")).status, 409);
       assert.match((await request("nonsense", {}, "error")).message, /Unknown/);
     } finally {
       for (const ws of clients) ws.terminate();

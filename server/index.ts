@@ -1,4 +1,10 @@
-import { createServer } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
+import { randomBytes } from "node:crypto";
+import { PredictionError } from "./predictions.js";
 import { readFile } from "node:fs/promises";
 import { resolve, extname } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
@@ -40,12 +46,94 @@ const vite = !production
     })
   : null;
 const root = resolve("dist/public");
+function audienceState(token: string) {
+  return {
+    now: Date.now(),
+    phase: game.phase,
+    remaining: game.remaining,
+    golden: game.golden,
+    score: { ...game.score },
+    predictions: game.predictions.summary(game.phase, game.score, game.ended),
+    pick: game.predictions.pick(token),
+  };
+}
+async function audienceRequest(req: IncomingMessage, res: ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    if (!["GET", "POST"].includes(req.method ?? "")) {
+      res.setHeader("Allow", "GET, POST");
+      throw new PredictionError("Method not allowed.", 405);
+    }
+    if (
+      req.headers.origin &&
+      new URL(req.headers.origin).host !== req.headers.host
+    )
+      throw new PredictionError("Open predictions on the game website.", 403);
+    const cookie = req.headers.cookie?.match(
+      /(?:^|;\s*)lvw-audience=([a-f0-9]{48})(?:;|$)/,
+    )?.[1];
+    const token = cookie ?? randomBytes(24).toString("hex");
+    if (req.method === "POST") {
+      if (
+        req.headers["content-type"]?.split(";")[0].trim() !== "application/json"
+      )
+        throw new PredictionError("Send a JSON prediction.", 415);
+      if (Number(req.headers["content-length"]) > 512) {
+        req.resume();
+        throw new PredictionError("Prediction message is too large.", 413);
+      }
+      let body = "",
+        size = 0;
+      for await (const chunk of req) {
+        size += Buffer.byteLength(chunk);
+        if (size <= 512) body += chunk.toString();
+      }
+      if (size > 512)
+        throw new PredictionError("Prediction message is too large.", 413);
+      let data;
+      try {
+        data = JSON.parse(body);
+      } catch {
+        throw new PredictionError("Invalid prediction message.");
+      }
+      game.predictions.choose(
+        token,
+        data?.team,
+        data?.roundId,
+        Date.now(),
+        game.phase,
+      );
+    }
+    if (!cookie)
+      res.setHeader(
+        "Set-Cookie",
+        `lvw-audience=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${req.headers["x-forwarded-proto"] === "https" ? "; Secure" : ""}`,
+      );
+    res.writeHead(200);
+    res.end(JSON.stringify(audienceState(token)));
+  } catch (error) {
+    res.writeHead(error instanceof PredictionError ? error.status : 400);
+    res.end(
+      JSON.stringify({
+        message:
+          error instanceof PredictionError
+            ? error.message
+            : "Invalid prediction request.",
+      }),
+    );
+  }
+}
 const server = createServer(async (req, res) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "same-origin");
   if (req.url === "/healthz") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end('{"ok":true}');
+    return;
+  }
+  if (req.url?.split("?")[0] === "/api/audience") {
+    await audienceRequest(req, res);
     return;
   }
   if (vite) {
@@ -62,7 +150,9 @@ const server = createServer(async (req, res) => {
       res.end();
       return;
     }
-    const target = ["/", "/join", "/host", "/screen"].includes(pathname)
+    const target = ["/", "/join", "/host", "/screen", "/predict"].includes(
+      pathname,
+    )
       ? resolve(root, "index.html")
       : file;
     const data = await readFile(target);
