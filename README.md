@@ -109,7 +109,7 @@ Use **Full field / Ball-follow camera** to switch framing. **Broadcast mode** hi
 
 ## Visual presentation and review
 
-The arena uses a real Three.js scene with original modeled stadium architecture, instanced seating/crowd, 3D goal nets, and articulated toy-like player models. Depth sorting, collision-aware nameplates, ball trails, team lighting and goal particles keep live play readable. Mobile players have a bright YOU marker, possession hint, shot-charge ring and dash cooldown. Turf is a cached high-resolution texture; crowd geometry is instanced. Hemispheric and directional lighting, soft cached contact shadows, and adaptive pixel resolution keep the scene readable. The renderer warms up in the lobby. The authoritative rules remain on a planar pitch; rendering is real 3D.
+The arena uses a real Three.js scene with original modeled stadium architecture, instanced seating/crowd, 3D goal nets, and articulated toy-like player models. Depth sorting, collision-aware nameplates, ball trails, team lighting and goal particles keep live play readable. Mobile players have a bright YOU marker, possession ring and action-button accent, shot-charge ring and dash cooldown. Turf is a cached high-resolution texture; crowd geometry is instanced. Hemispheric and directional lighting, soft cached contact shadows, and adaptive pixel resolution keep the scene readable. The renderer warms up in the lobby. The authoritative rules remain on a planar pitch; rendering is real 3D.
 
 An independent critic reviewed the 2D iterations and the 3D conversion and scored the previous 2D version 8.3/10 and the final **3D version 8.2/10**. See [VISUAL_REVIEW.md](VISUAL_REVIEW.md) for findings and screenshot provenance. Review screenshots are generated local artifacts in `artifacts/final-screenshots/`; `artifacts/office-arena-screenshots.zip` contains the set. These are excluded from Git; the capture helpers can reproduce them. Screenshot capture helpers in `scripts/capture-*.mjs` are for an isolated development server only: they reset its lobby and create test players.
 
@@ -147,3 +147,22 @@ A temporary HttpOnly, SameSite cookie keeps one pick per browser across refreshe
 Audience phones poll a small `/api/audience` JSON summary every two seconds (ten seconds while hidden). They do not create player WebSocket connections, download position snapshots or run the 3D render loop. They therefore do not consume the game's 64 realtime connection slots. The usual Cloud Run instance memory, request concurrency and CPU limits still apply; rehearse at the expected meeting audience size.
 
 Prediction tests cover full-team lobbies, replacement/idempotence, validation/rate limits, host-start locking, Reorg, Golden Goal, host-ended results, reset/rematch behavior and bounded memory. HTTP integration tests exercise cookies, refresh identity, payload/origin validation and server-side locking. The mobile browser flow covers entry from a full lobby, picks and changes, refresh, shared totals, locking and rematch lobby reset.
+
+## Quieter mobile gameplay HUD
+
+Landscape player views use a thin score/time rail and low-ink controls. On wider phones the joystick and action buttons sit in gutters beside the arena. Small phones retain the field width and use translucent bottom-corner controls. The separate name card, possession banner and pitch branding are removed; the in-world YOU marker and possession ring, action-button border, charge ring, RELEASE label and dash cooldown carry the important feedback. Countdown instructions still teach tap to pass and hold to shoot.
+
+The joystick keeps an 84–88 px target, pass/shoot is 76–80 px and dash is 48–52 px. Knob travel stays inside its ring. Fullscreen and safe areas use the same layout, and the Reorg reveal expands across the entire phone. Spectator and host scoreboards keep their event presentation. Golden Goal/final-minute cues sit near the top of the field during mobile play, rather than covering midfield.
+
+The independent critic scored the crowded baseline **5.9/10** and approved the revision at **8.5/10 for visual clarity** and **8.4/10 for player UX**. These are screenshot-based qualitative scores, not physical-device comfort or network measurements. See `VISUAL_REVIEW.md` for evidence. Rehearse on the actual iPhone/Android devices used at the event.
+
+To reproduce review screenshots, start an isolated development server (the helper resets its lobby and creates TEST participants):
+
+```sh
+PORT=3110 npm run dev
+# In another terminal:
+HUD_CAPTURE_TAG=final node scripts/capture-mobile-hud.mjs
+HUD_CAPTURE_SKILLS=1 HUD_CAPTURE_TAG=final node scripts/capture-mobile-hud.mjs
+```
+
+Screenshots and metrics are generated under `artifacts/mobile-hud/` and excluded from Git. The standard captures hold a genuine 12-player PLAYING snapshot for still review. The skills capture uses real joystick movement to acquire possession and real dash/shot input in a two-player test match, holding only the genuine charging snapshot for its still. No player positions, scores, possession or phases are injected.

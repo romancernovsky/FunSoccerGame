@@ -85,6 +85,21 @@ test("02:00 Reorg changes teams and kits, survives refresh/pause, then kicks off
       /blue \(LEADERS\)/,
     );
     await expect(page.locator(".reorg-board")).toBeVisible();
+    const revealBounds = await page.evaluate(() => ({
+      field: document
+        .querySelector(".arena-wrap")!
+        .getBoundingClientRect()
+        .toJSON(),
+      game: document
+        .querySelector(".player-game")!
+        .getBoundingClientRect()
+        .toJSON(),
+    }));
+    expect(revealBounds.field.x).toBe(revealBounds.game.x);
+    expect(revealBounds.field.y).toBe(revealBounds.game.y);
+    expect(revealBounds.field.width).toBe(revealBounds.game.width);
+    expect(revealBounds.field.height).toBe(revealBounds.game.height);
+    await page.screenshot({ path: "artifacts/mobile-hud/final-reorg.png" });
     await expect(page.locator(".reorg-local")).toContainText("LEADERS");
     await expect(page.locator(".reorg-team.leaders li.is-you")).toContainText(
       "Maya",

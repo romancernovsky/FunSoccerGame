@@ -331,6 +331,20 @@ test("mobile: fullscreen fallback, team choice, landscape joystick, action and d
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(844);
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(390);
     }
+    await expect(
+      page.locator(".mobile-identity, #possession-hint"),
+    ).toHaveCount(0);
+    const field = (await page.locator(".arena-wrap").boundingBox())!;
+    const score = (await page.locator(".player-scoreboard").boundingBox())!;
+    expect(score.height).toBeLessThanOrEqual(28);
+    expect(score.y + score.height).toBeLessThanOrEqual(field.y);
+    const leftControl = (await page.locator("#joystick").boundingBox())!;
+    expect(leftControl.x + leftControl.width).toBeLessThanOrEqual(field.x);
+    for (const selector of ["#shoot", "#dash"]) {
+      const control = (await page.locator(selector).boundingBox())!;
+      expect(control.x).toBeGreaterThanOrEqual(field.x + field.width);
+      expect(control.width).toBeGreaterThanOrEqual(48);
+    }
     const x = host.state!.players.find((p) => p.name === "Mobile")!.x,
       box = (await page.locator("#joystick").boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -347,6 +361,53 @@ test("mobile: fullscreen fallback, team choice, landscape joystick, action and d
         () => host.state!.players.find((p) => p.name === "Mobile")!.dashReady,
       )
       .toBeGreaterThan(0);
+    for (const width of [740, 568]) {
+      await page.setViewportSize({ width, height: 320 });
+      const pitch = (await page.locator(".arena-wrap").boundingBox())!;
+      const viewport = await page.evaluate(() => ({
+        width: visualViewport!.width,
+        height: visualViewport!.height,
+      }));
+      expect(pitch.width).toBeGreaterThanOrEqual(
+        viewport.width - (width === 568 ? 1 : 192),
+      );
+      for (const selector of ["#joystick", "#shoot", "#dash"]) {
+        const control = (await page.locator(selector).boundingBox())!;
+        expect(control.x).toBeGreaterThanOrEqual(0);
+        expect(control.y).toBeGreaterThanOrEqual(0);
+        expect(control.x + control.width).toBeLessThanOrEqual(
+          viewport.width + 1,
+        );
+        expect(control.y + control.height).toBeLessThanOrEqual(
+          viewport.height + 1,
+        );
+        expect(Math.min(control.width, control.height)).toBeGreaterThanOrEqual(
+          48,
+        );
+      }
+    }
+    const smallStick = (await page.locator("#joystick").boundingBox())!;
+    const beforeSmallMove = host.state!.players.find(
+      (p) => p.name === "Mobile",
+    )!.x;
+    await page.mouse.move(
+      smallStick.x + smallStick.width / 2,
+      smallStick.y + smallStick.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      smallStick.x + 3,
+      smallStick.y + smallStick.height / 2,
+    );
+    await expect
+      .poll(() => host.state!.players.find((p) => p.name === "Mobile")!.x)
+      .toBeLessThan(beforeSmallMove - 20);
+    const knob = (await page.locator("#stick").boundingBox())!;
+    expect(knob.x).toBeGreaterThanOrEqual(smallStick.x);
+    expect(knob.x + knob.width).toBeLessThanOrEqual(
+      smallStick.x + smallStick.width,
+    );
+    await page.mouse.up();
     await page.getByRole("button", { name: "Exit full screen" }).tap();
     await expect(page.locator("body")).not.toHaveClass(/player-fullscreen/);
     // A browser that exposes fullscreen but rejects the request stays playable.

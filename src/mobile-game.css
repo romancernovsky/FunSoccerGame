@@ -1,0 +1,298 @@
+/* The player HUD is deliberately quieter than the projector presentation. */
+#player-fullscreen svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.action-controls > button > svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+@media (pointer: coarse) and (orientation: landscape) {
+  .game-main .player-game {
+    --control-gutter: 96px;
+    display: grid;
+    grid-template-columns:
+      calc(var(--control-gutter) + env(safe-area-inset-left, 0px))
+      minmax(0, 1fr) calc(
+        var(--control-gutter) + env(safe-area-inset-right, 0px)
+      );
+    grid-template-rows: calc(28px + env(safe-area-inset-top, 0px)) minmax(
+        0,
+        1fr
+      );
+    align-items: stretch;
+    justify-content: initial;
+    background: #071b27;
+    overflow: hidden;
+  }
+  .game-main .player-game > .player-scoreboard {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: center;
+    position: static;
+    transform: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: auto;
+    min-height: 26px;
+    height: 26px;
+    margin: 0;
+    padding: 0 4px;
+    gap: 10px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .game-main .player-scoreboard::before,
+  .game-main .player-scoreboard::after,
+  .game-main .player-scoreboard .score-team > span,
+  .game-main .clock-wrap small,
+  .game-main .pitch-label,
+  .game-main .pitch-watermark {
+    display: none;
+  }
+  .game-main .player-scoreboard .score-team {
+    font:
+      700 10px "DM Sans",
+      sans-serif;
+    letter-spacing: 0.5px;
+  }
+  .game-main .player-scoreboard .score {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    min-width: 42px;
+    padding: 0;
+    gap: 7px;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .game-main .player-scoreboard .score > span {
+    font-size: 12px;
+  }
+  .game-main .player-scoreboard .clock-wrap {
+    padding-left: 10px;
+    border-left: 1px solid #bdd8e62e;
+    margin: 0 0 0 2px;
+  }
+  .game-main .player-scoreboard .clock-wrap strong {
+    font-size: 16px;
+    line-height: 1;
+    color: #c9d9df;
+    font-variant-numeric: tabular-nums;
+  }
+  .game-main .player-game > .arena-wrap {
+    grid-column: 2;
+    grid-row: 2;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-width: none;
+    aspect-ratio: auto;
+    flex: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .game-main .mobile-controls {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    pointer-events: none;
+  }
+  .game-main .joystick {
+    position: absolute;
+    left: calc(4px + env(safe-area-inset-left, 0px));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: 88px;
+    height: 88px;
+    border: 1px solid #b5d9e13d;
+    background: #b5d9e107;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .game-main .joystick > span {
+    width: 38px;
+    height: 38px;
+    background: #b5d9e12b;
+    border: 1px solid #c2e2e973;
+    box-shadow: none;
+  }
+  .game-main .joystick small {
+    font-size: 8px;
+    color: #abc5cf;
+  }
+  .game-main .action-controls {
+    position: absolute;
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    pointer-events: none;
+  }
+  .game-main .action-controls > button {
+    pointer-events: auto;
+  }
+  .game-main .action-controls .shoot {
+    width: 80px;
+    height: 80px;
+    border: 2px solid #c9eda56b;
+    color: #e1f4c4;
+    background: #c5ec9a1a;
+    box-shadow: none;
+    text-shadow: none;
+    gap: 5px;
+  }
+  .game-main .action-controls .shoot:active {
+    background: #c5ec9a3d;
+  }
+  .game-main .action-controls .shoot small {
+    font-size: 9px;
+    letter-spacing: 0;
+    max-width: 74px;
+  }
+  .game-main .action-controls .dash {
+    width: 52px;
+    height: 52px;
+    margin: 0;
+    color: #bbd2df;
+    background: #b5d9e10c;
+    border: 1px solid #b5d9e13d;
+    box-shadow: none;
+    gap: 1px;
+  }
+  .game-main .action-controls .dash svg {
+    width: 18px;
+    height: 18px;
+  }
+  .game-main .action-controls .dash small {
+    font-size: 8px;
+  }
+  .game-main #charge-bar {
+    display: none;
+  }
+  .game-main .player-toolbar {
+    position: absolute;
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    top: max(2px, env(safe-area-inset-top));
+    margin: 0;
+  }
+  .game-main #player-fullscreen {
+    width: 44px;
+    min-height: 44px;
+    padding: 10px;
+    background: transparent;
+    border-color: transparent;
+    color: #aac5d0;
+    box-shadow: none;
+  }
+  .game-main .arena-overlay {
+    padding-bottom: 0;
+  }
+  .game-main .player-game:has(.arena-overlay.reorg) > .arena-wrap {
+    grid-area: 1 / 1 / -1 / -1;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 8;
+  }
+  .game-main .player-game:has(.arena-overlay.reorg) > .player-scoreboard {
+    visibility: hidden;
+  }
+  .game-main:has(.arena-overlay.paused) .mobile-controls,
+  .game-main:has(.arena-overlay.goal) .mobile-controls,
+  .game-main:has(.arena-overlay.finished) .mobile-controls {
+    display: none;
+  }
+}
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 800px) {
+  .game-main .player-game {
+    --control-gutter: 88px;
+  }
+  .game-main .joystick {
+    left: calc(2px + env(safe-area-inset-left, 0px));
+    width: 84px;
+    height: 84px;
+  }
+  .game-main .action-controls {
+    right: calc(4px + env(safe-area-inset-right, 0px));
+  }
+}
+/* Tiny phones keep pitch scale; shallow translucent controls use only its corners. */
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 640px) {
+  .game-main .player-game {
+    --control-gutter: 0px;
+  }
+  .game-main .player-game > .arena-wrap {
+    width: 100%;
+  }
+  .game-main .player-scoreboard .score-team {
+    font-size: 9px;
+  }
+  .game-main .player-game > .player-scoreboard {
+    gap: 8px;
+  }
+  .game-main .joystick {
+    left: calc(8px + env(safe-area-inset-left, 0px));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 84px;
+    height: 84px;
+    background: #0c233211;
+  }
+  .game-main .action-controls {
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .game-main .action-controls .shoot {
+    width: 76px;
+    height: 76px;
+    background: #102b2d80;
+  }
+  .game-main .action-controls .dash {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 2px;
+    background: #0c233244;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) {
+  .game-main .action-controls .shoot {
+    padding: 0;
+  }
+  .game-main .action-controls .shoot small {
+    white-space: nowrap;
+    max-width: none;
+  }
+  .game-main .action-controls .shoot.has-ball {
+    background: #c5ec9a33;
+    border-color: #dafa95;
+    color: #eeffd6;
+  }
+  .game-main .player-scoreboard .clock-wrap strong.urgent {
+    color: #f4b77d;
+  }
+  .game-main .arena-overlay.playing > .golden-banner {
+    position: absolute;
+    top: 4px;
+    font-size: 8px;
+    padding: 5px 9px;
+    letter-spacing: 0.5px;
+  }
+}

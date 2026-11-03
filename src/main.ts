@@ -23,6 +23,7 @@ import {
   type Player,
 } from "./shared";
 import "./style.css";
+import "./mobile-game.css";
 const arrow =
   '<svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -175,8 +176,8 @@ function teamCard(team: Team, manage = false) {
 function qrCard() {
   return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to play or predict</strong><a class="join-link" href="/join">${esc(location.host)}/join ↗</a><div class="quick-facts"><span>◷ 5 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
 }
-function scoreboard() {
-  return `<div class="scoreboard"><div class="score-team blue"><span>${arrow}</span> LEADERS</div><div class="score"><b id="score-l">${state?.score.LEADERS ?? 0}</b><span>:</span><b id="score-w">${state?.score.WORKERS ?? 0}</b></div><div class="score-team orange">WORKERS <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
+function scoreboard(player = false) {
+  return `<div class="scoreboard${player ? " player-scoreboard" : ""}"><div class="score-team blue"><span>${arrow}</span> LEADERS</div><div class="score"><b id="score-l">${state?.score.LEADERS ?? 0}</b><span>:</span><b id="score-w">${state?.score.WORKERS ?? 0}</b></div><div class="score-team orange">WORKERS <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
 }
 function arena() {
   const predictions = state?.predictions;
@@ -186,7 +187,7 @@ function arena() {
   return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><span class="pitch-label">OFFICE ARENA / ${state?.phase === "WAITING" ? "PRE-MATCH" : "LIVE MATCH"}</span><span class="pitch-watermark">EASY TO PLAY. FUN TO WATCH.</span>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>AUDIENCE PICKS</span><b>${leaders}% LEADERS</b><b>${100 - leaders}% WORKERS</b></div>` : ""}</div>`;
 }
 function controls() {
-  return `<div class="mobile-identity"><i></i><span>${esc(me()?.name ?? "")}<small>YOU · ${me()?.team ?? ""}</small></span></div><div id="possession-hint" class="possession-hint"></div><div class="mobile-controls"><div id="joystick" class="joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash">↯<small>DASH</small></button><button id="shoot" class="shoot">◉<small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>The whole pitch looks better in landscape.</p></div>`;
+  return `<div class="mobile-controls"><div id="joystick" class="joystick" aria-label="Movement joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash" aria-label="Dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 5 7 7-7 7M3 12h14M17 5l5 7-5 7"/></svg><small>DASH</small></button><button id="shoot" class="shoot" aria-label="Pass or shoot: tap to pass, hold and release to shoot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m12 8 4 3-1.5 4h-5L8 11zM12 4v4M20 10l-4 1M17 19l-2.5-4M7 19l2.5-4M4 10l4 1"/></svg><small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>The whole pitch looks better in landscape.</p></div>`;
 }
 function updateGameViewport() {
   const viewport = window.visualViewport;
@@ -256,7 +257,7 @@ function setPlayerFullscreen(enabled: boolean, requestBrowser = true) {
   }
 }
 function playerToolbar() {
-  return `<div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${playerFullscreen ? "Exit" : "Enter"} full screen" aria-pressed="${playerFullscreen}"><b aria-hidden="true">${playerFullscreen ? "↙" : "⛶"}</b><span>${playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
+  return `<div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${playerFullscreen ? "Exit" : "Enter"} full screen" aria-pressed="${playerFullscreen}"><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
 }
 function watchToolbar() {
   return `<div class="watch-toolbar"><span class="eyebrow"><i class="live-dot"></i> LIVE BROADCAST</span><div><button class="secondary compact" id="watch-sound">${sound ? "◖ Sound on" : "◖ Enable sound"}</button><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "↙ Exit broadcast" : "⛶ Broadcast mode"}</button></div></div>`;
@@ -270,7 +271,7 @@ function joinPanel() {
   const p = me();
   if (p) {
     if (active())
-      return `<div class="player-game">${playerToolbar()}${scoreboard()}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${p.team.toLowerCase()}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
+      return `<div class="player-game">${playerToolbar()}${scoreboard(true)}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${p.team.toLowerCase()}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
     return `<div class="waiting-layout"><section class="joined-card"><div class="check-mark">✓</div><span class="eyebrow">YOU ARE IN</span><h1>TEAM<br><span class="${p.team === "LEADERS" ? "blue" : "orange"}">${p.team}</span></h1><p>Welcome, <strong>${esc(p.name)}</strong>.<br>Get your game face on.</p><div class="waiting-pill"><i></i>Waiting for host…</div><div class="how-to"><span><b>↔</b>MOVE<small>Joystick / WASD</small></span><span><b>◉</b>PASS<small>Tap</small></span><span><b>↗</b>SHOOT<small>Hold & release</small></span><span><b>ϟ</b>DASH<small>Button / Shift</small></span></div></section>${teamCard(p.team)}</div>`;
   }
   if (active())
@@ -462,7 +463,11 @@ function bind() {
         d = Math.max(40, Math.hypot(dx, dy));
       joystick = { x: dx / d, y: dy / d };
       const knob = stick.querySelector<HTMLElement>("#stick")!;
-      knob.style.transform = `translate(${joystick.x * 35}px,${joystick.y * 35}px)`;
+      const travel = Math.max(
+        0,
+        (Math.min(r.width, r.height) - knob.offsetWidth) / 2 - 3,
+      );
+      knob.style.transform = `translate(${joystick.x * travel}px,${joystick.y * travel}px)`;
     };
     stick.onpointerdown = (e) => {
       pointer = e.pointerId;
@@ -834,22 +839,13 @@ function draw(time: number) {
     bar.style.width = charging
       ? `${Math.min(100, (time - chargeStarted) / 10)}%`
       : "0%";
-  const hint = document.querySelector<HTMLElement>("#possession-hint");
-  if (hint) {
-    const own = state.ball.owner === identity;
-    hint.classList.toggle("has-ball", own);
-    hint.textContent = own
-      ? charging
-        ? "◉ CHARGING SHOT… RELEASE TO SHOOT"
-        : "● YOUR BALL · TAP PASS / HOLD SHOOT"
-      : "◎ CHASE THE BALL";
-  }
   const shoot = document.querySelector<HTMLButtonElement>("#shoot");
   if (shoot) {
     const charge = charging ? Math.min(100, (time - chargeStarted) / 10) : 0;
     shoot.style.setProperty("--charge", `${charge}%`);
+    shoot.classList.toggle("has-ball", state.ball.owner === identity);
     const text = shoot.querySelector("small");
-    if (text) text.textContent = charging ? "RELEASE TO SHOOT" : "PASS / SHOOT";
+    if (text) text.textContent = charging ? "RELEASE" : "PASS / SHOOT";
   }
   const dash = document.querySelector<HTMLButtonElement>("#dash");
   if (dash) {
