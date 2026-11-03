@@ -1,0 +1,36 @@
+{
+  "name": "leaders-vs-workers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "build": "tsc --noEmit && vite build && esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
+    "start": "node dist/server.js",
+    "test": "tsx --test tests/*.test.ts",
+    "check": "tsc --noEmit",
+    "test:browser": "playwright test",
+    "test:load": "tsx scripts/load.ts",
+    "format": "prettier --write src server tests scripts *.ts *.json index.html README.md",
+    "test:reorg": "playwright test --config=playwright.reorg.config.ts"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
+    "qrcode": "^1.5.4",
+    "three": "^0.187.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.0.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/three": "^0.187.0",
+    "@types/ws": "^8.5.13",
+    "esbuild": "^0.25.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}
