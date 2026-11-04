@@ -302,24 +302,94 @@
 }
 #display-help {
   max-width: 470px;
+  width: calc(100% - 24px);
   max-height: calc(100dvh - 24px);
   overflow: auto;
+  padding: 20px;
+  background: #0c2434;
+  border-color: #bed8e442;
 }
 #display-help p,
 #display-help li {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.6;
+  color: #bcd0d8;
 }
-#display-help ol {
-  padding-left: 22px;
+#display-help h2 {
+  font-size: 32px;
+  line-height: 1.1;
+  margin: 0 0 12px;
+}
+#display-help #display-help-intro {
+  margin-bottom: 20px;
+}
+#display-help .install-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+#display-help .install-steps li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px 12px;
+  background: #173446;
+  border: 1px solid #bed8e426;
+  border-radius: 10px;
+}
+#display-help .install-steps li > div > strong {
+  display: block;
+  font-size: 16px;
+  color: #f0f4e6;
+}
+#display-help .install-steps p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+#display-help .install-step-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  color: #dafa95;
+  background: #0c2434;
+}
+#display-help .install-step-visual > svg {
+  width: 28px;
+  height: 28px;
+}
+#display-help .install-step-visual > b {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+  color: #122735;
+  background: #dafa95;
+  border-radius: 50%;
+}
+#display-help .install-app-icon img {
+  border-radius: 10px;
 }
 #display-help .display-help-note {
   color: #e5bf8e;
+  font-size: 14px;
   margin: 15px 0;
 }
 #display-help button {
   width: 100%;
-  margin-top: 14px;
+  min-height: 48px;
+  font-size: 16px;
+  margin-top: 20px;
 }
 @media (pointer: coarse) and (orientation: landscape) {
   .game-main .player-view-tools {
@@ -400,6 +470,23 @@
 .ios-launch-tip button {
   flex: none;
   min-height: 44px;
+  gap: 10px;
+}
+.ios-launch-tip .install-pitch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ios-launch-tip .install-pitch > img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex: none;
+}
+.ios-launch-tip button > svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 @media (max-width: 600px) {
   .ios-launch-tip {
@@ -419,7 +506,12 @@
   gap: 20px;
   min-height: 44px;
   margin-bottom: 12px;
-  background: #203025;
+  background: #0c2434;
+}
+#display-help .display-help-toolbar .eyebrow {
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.7px;
 }
 #display-help .display-help-toolbar button {
   display: grid;

@@ -36,6 +36,8 @@ Native **Full screen** is available only where the browser supports it. Unsuppor
 
 Set up the Home Screen app **before joining**: Safari and standalone storage/session continuity is not guaranteed. If you already joined, stay in that tab for the current match. The guide has an always-visible close control and does not permit movement/shot keyboard input behind it.
 
+On iPhone, the join page's **Add to Home Screen** button opens a short illustrated guide showing the Safari Share icon, the Add action and the actual Office Arena icon to launch. **Play in browser** closes the guide without losing the name you entered. This button cannot create the shortcut or open Apple's Add to Home Screen confirmation automatically: iOS does not support the web `beforeinstallprompt` API. The guide is hidden when launched as a standalone Home Screen app.
+
 Enable sound with the button on the projector after an initial browser interaction. Host audio is separately opt-in; leave it off when the projector is the audio source. Phones are silent. All effects are original synthesized tones and filtered noise, including the goal cheer; no third-party sound assets. Display graphics and characters are drawn in code. UI fonts are self-hosted Barlow Condensed and DM Sans (SIL Open Font License), with system fallbacks. The event UI makes no external font requests.
 
 ## Production

@@ -320,7 +320,7 @@ function joinPanel() {
   const display = displayCapabilities();
   const launchTip =
     display.appleTouch && !display.native && !display.standalone
-      ? '<aside class="ios-launch-tip"><p><strong>More room on iPhone.</strong> Use a Home Screen web app to remove Safari bars. Set it up before joining.</p><button id="fullscreen-guide" class="secondary compact">HOW TO OPEN</button></aside>'
+      ? '<aside class="ios-launch-tip"><div class="install-pitch"><img src="/icons/arena-192.png" alt="" width="44" height="44"><p><strong>Play without Safari bars.</strong><br>Add a shortcut before joining.</p></div><button id="fullscreen-guide" class="secondary compact" aria-haspopup="dialog" aria-label="Add to Home Screen: show setup guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 9H5v12h14V9h-3M12 15V2m-4 4 4-4 4 4"/></svg>ADD TO HOME SCREEN</button></aside>'
       : "";
   return `${launchTip}<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br> Make some<br> <em>noise.</em></h1><p>The three-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" aria-pressed="${selected === t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME ${arrow}</button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
 }
@@ -427,7 +427,7 @@ function confirmCommand(action: string) {
 function bind() {
   document
     .querySelector("#fullscreen-guide")
-    ?.addEventListener("click", () => showDisplayHelp(true));
+    ?.addEventListener("click", () => showDisplayHelp(true, false));
   document.querySelector("#player-camera")?.addEventListener("click", () => {
     stopInput();
     playerOverview = !playerOverview;

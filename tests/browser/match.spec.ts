@@ -295,13 +295,43 @@ test("mobile: short iPhone viewport, readable ball, player camera, honest fullsc
   try {
     await page.goto("/join");
     await expect(page.locator("#fullscreen-guide")).toBeVisible();
-    await page.locator("#fullscreen-guide").click();
-    await expect(page.getByRole("dialog")).toContainText("Add to Home Screen");
-    await expect(page.getByRole("dialog")).toContainText(
-      "before the host starts",
+    await expect(page.locator("#fullscreen-guide")).toHaveAttribute(
+      "aria-label",
+      "Add to Home Screen: show setup guide",
     );
-    await page.getByRole("button", { name: "Close screen help" }).click();
+    await page.screenshot({
+      path: "artifacts/install-guide/iphone-join.png",
+      fullPage: true,
+    });
     await page.locator("#name").fill("Mobile");
+    await page.locator("#fullscreen-guide").click();
+    const setupGuide = page.getByRole("dialog", { name: "Add Office Arena." });
+    await expect(setupGuide).toContainText("Add to Home Screen");
+    await expect(setupGuide).toContainText("Open as Web App");
+    await expect(setupGuide).toContainText("before the host starts");
+    for (const description of await setupGuide
+      .locator(".install-steps p")
+      .all())
+      expect(
+        await description.evaluate((el) =>
+          parseFloat(getComputedStyle(el).fontSize),
+        ),
+      ).toBeGreaterThanOrEqual(14);
+    await page.screenshot({ path: "artifacts/install-guide/iphone-390.png" });
+    await page.setViewportSize({ width: 320, height: 568 });
+    expect(
+      await setupGuide.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: "artifacts/install-guide/iphone-320.png" });
+    // Setup only provides guidance; it never joins a player or claims installation.
+    expect(host.state!.players).toHaveLength(1);
+    expect(host.state!.phase).toBe("WAITING");
+    await page
+      .getByRole("button", { name: "PLAY IN BROWSER", exact: true })
+      .click();
+    await expect(setupGuide).toBeHidden();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator("#name")).toHaveValue("Mobile");
     await page.locator('[data-team="WORKERS"]').click();
     await page.getByRole("button", { name: /JOIN GAME/ }).click();
     await expect(page.getByText("YOU ARE IN")).toBeVisible();
