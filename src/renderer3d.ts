@@ -478,8 +478,12 @@ export class Arena3D {
     right.position.set(0.09, 0, 0);
     const hash = [...p.id].reduce((a, v) => a + v.charCodeAt(0), 0),
       skin = ["#edbf97", "#b97c55", "#f3cfa5", "#805039", "#d5a078"][hash % 5],
-      hair = ["#2d2631", "#563a29", "#dcb56d", "#32272c"][hash % 4],
       blue = p.team === "LEADERS",
+      hair = (
+        blue
+          ? ["#f5d77e", "#e9c361", "#ffe3a0", "#e4ba58"]
+          : ["#2d2631", "#563a29", "#32272c", "#3d2d25"]
+      )[hash % 4],
       shirtColor = blue ? "#168bf5" : "#f58228";
     for (const leg of [left, right]) {
       box(leg, 0, 0.085, 0.025, 0.125, 0.12, 0.21, "#163044", true);
@@ -538,32 +542,50 @@ export class Arena3D {
       );
     }
     const head = new THREE.Group();
+    head.name = "head";
+    head.position.y = 0.77;
     body.add(head);
-    orb(head, 0, 0.77, 0, 0.21, skin, 1, 1.08, 0.95);
-    orb(head, -0.21, 0.77, 0, 0.048, skin);
-    orb(head, 0.21, 0.77, 0, 0.048, skin);
+    orb(head, 0, 0, 0, 0.21, skin, 1, 1.08, 0.95);
+    orb(head, -0.21, 0, 0, 0.048, skin);
+    orb(head, 0.21, 0, 0, 0.048, skin);
+    const hairstyle = new THREE.Group();
+    hairstyle.name = "hair";
+    head.add(hairstyle);
     const hairCap = new THREE.Mesh(
       new THREE.SphereGeometry(0.215, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.45),
       mat(hair),
     );
-    hairCap.position.set(0, 0.815, 0);
+    hairCap.position.set(0, 0.045, 0);
     hairCap.castShadow = true;
-    head.add(hairCap);
+    hairstyle.add(hairCap);
     for (const hx of [-0.11, 0, 0.1])
-      orb(head, hx, 0.88, 0.14, 0.065, hair, 1.3, 0.55, 0.7);
-    for (const ex of [-0.075, 0.075]) {
-      orb(head, ex, 0.785, 0.213, 0.047, "#fff8df", 1, 1.1, 0.4);
-      orb(head, ex, 0.781, 0.238, 0.026, "#162a38", 1, 1, 0.4);
-      orb(head, ex - 0.008, 0.795, 0.249, 0.008, "#ffffff");
+      orb(hairstyle, hx, 0.11, 0.1, 0.065, hair, 1.3, 0.55, 0.7);
+    // One rigid face rig: eye whites, pupils and highlights inherit head turns.
+    // Lift the eyes toward the brow so the overhead camera can read the gaze.
+    const face = new THREE.Group();
+    face.name = "face";
+    face.position.set(0, 0.07, 0.18);
+    head.add(face);
+    for (const [side, x] of [
+      ["left", -0.075],
+      ["right", 0.075],
+    ] as const) {
+      const eye = new THREE.Group();
+      eye.name = `${side}-eye`;
+      eye.position.x = x;
+      face.add(eye);
+      orb(eye, 0, 0, 0, 0.052, "#fff8df", 1, 1.1, 0.45).name = "white";
+      orb(eye, 0, 0, 0.026, 0.027, "#162a38", 1, 1, 0.4).name = "pupil";
+      orb(eye, -0.008, 0.012, 0.039, 0.007, "#ffffff").name = "highlight";
     }
-    orb(head, 0, 0.735, 0.224, 0.027, skin, 0.7, 0.65, 1.2);
+    orb(face, 0, -0.105, 0.044, 0.027, skin, 0.7, 0.65, 1.2);
     const mouth = new THREE.Mesh(
       new THREE.TorusGeometry(0.045, 0.008, 4, 12, Math.PI),
       mat("#744538"),
     );
-    mouth.position.set(0, 0.721, 0.211);
+    mouth.position.set(0, -0.119, 0.031);
     mouth.rotation.z = Math.PI;
-    head.add(mouth);
+    face.add(mouth);
     const ring = mesh(
       root,
       new THREE.RingGeometry(0.28, 0.315, 48),

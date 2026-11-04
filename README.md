@@ -121,6 +121,8 @@ Use **Full field / Ball-follow camera** to switch framing. **Broadcast mode** hi
 
 ## Visual presentation and review
 
+Leaders wear blue with blond hair; Workers wear orange with dark hair. Kit and hair follow the current team, including after a host move or the Reorg. Eye whites, pupils and highlights are grouped with the face and turn with the head.
+
 The arena uses a real Three.js scene with original modeled stadium architecture, instanced seating/crowd, 3D goal nets, and articulated toy-like player models. Depth sorting, collision-aware nameplates, ball trails, team lighting and goal particles keep live play readable. Mobile players have a bright YOU marker, possession ring and action-button accent, shot-charge ring and dash cooldown. Turf is a cached high-resolution texture; crowd geometry is instanced. Hemispheric and directional lighting, soft cached contact shadows, and adaptive pixel resolution keep the scene readable. The renderer warms up in the lobby. The authoritative rules remain on a planar pitch; rendering is real 3D.
 
 An independent critic reviewed the 2D iterations and the 3D conversion and scored the previous 2D version 8.3/10 and the final **3D version 8.2/10**. See [VISUAL_REVIEW.md](VISUAL_REVIEW.md) for findings and screenshot provenance. Review screenshots are generated local artifacts in `artifacts/final-screenshots/`; `artifacts/office-arena-screenshots.zip` contains the set. These are excluded from Git; the capture helpers can reproduce them. Screenshot capture helpers in `scripts/capture-*.mjs` are for an isolated development server only: they reset its lobby and create test players.
