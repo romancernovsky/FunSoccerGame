@@ -314,6 +314,7 @@ function audioPanel() {
 function updateAudioUI() {
   if (!matchAudio) return;
   const { status, volume } = matchAudio;
+  document.body.dataset.audioStatus = status;
   document
     .querySelectorAll<HTMLButtonElement>('[data-audio-action="toggle"]')
     .forEach((button) => {
@@ -341,7 +342,7 @@ function updateAudioUI() {
       on:
         volume === 0
           ? "Volume is 0%. Raise the volume to hear the match."
-          : `Sound enabled · ${Math.round(volume * 100)}% volume. Test your speakers before starting.`,
+          : `Sound enabled · ${Math.round(volume * 100)}% volume. When broadcasting, include tab audio in your meeting.`,
       blocked:
         "Audio was blocked or interrupted. Tap Resume sound. Check device volume if it stays silent.",
       unavailable:
@@ -434,6 +435,8 @@ function render() {
 }
 function command(action: string, confirm = false) {
   error = "";
+  if (["start", "restart", "resume", "rematch"].includes(action))
+    matchAudio?.enableForMatch();
   send("command", { action, confirm });
 }
 function confirmCommand(action: string) {
@@ -495,6 +498,7 @@ function bind() {
   });
   document.querySelector("#broadcast-mode")?.addEventListener("click", () => {
     broadcast = !broadcast;
+    if (broadcast) matchAudio?.enableForMatch();
     signature = "";
     render();
     if (broadcast && !document.fullscreenElement)

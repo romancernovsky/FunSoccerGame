@@ -109,6 +109,97 @@ const resetPeak = (page: Page) =>
     }
   });
 
+test("host start unlocks sound, background broadcast stays audible, pauses are quiet and mute is respected", async ({
+  page,
+}) => {
+  const host = await hostControl();
+  const players: WebSocket[] = [];
+  await probe(page);
+  try {
+    // Two idle real clients keep the ball untouched, so ongoing audio must be
+    // stadium ambience rather than a bot's incidental pass/shot.
+    for (const [name, team] of [
+      ["Avery", "LEADERS"],
+      ["Morgan", "WORKERS"],
+    ]) {
+      const ws = new WebSocket("ws://127.0.0.1:3100/ws");
+      players.push(ws);
+      await new Promise((resolve) => ws.once("open", resolve));
+      ws.send(JSON.stringify({ type: "join", data: { name, team } }));
+    }
+    await expect.poll(() => host.state().players.length).toBe(2);
+    await page.goto("/host");
+    await expect(page.locator('[data-command="start"]')).toBeEnabled();
+    await page.locator('[data-command="start"]').click();
+    await expect(page.locator("dialog")).toBeVisible();
+    // Opening an incomplete-team confirmation must not start audio/the match.
+    expect(await page.evaluate(() => (window as any).__contexts.length)).toBe(
+      0,
+    );
+    await page.locator("#confirm").click();
+    const panel = page.locator(".audio-panel");
+    await expect(panel).toHaveAttribute("data-status", "on");
+    await startMeter(page);
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+    await expect.poll(() => host.state().phase).toBe("PLAYING");
+    await page.waitForTimeout(1000); // Let the kickoff whistle finish.
+    await resetPeak(page);
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.0005);
+
+    // Simulate the visibility signal produced when a presenter switches tabs;
+    // all samples still come from the real Web Audio graph/audio thread.
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        get: () => (window as any).__background ?? false,
+      });
+      (window as any).__background = true;
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect(panel).toHaveAttribute("data-status", "on");
+    await resetPeak(page);
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.0005);
+    host.command("pause");
+    await expect.poll(() => host.state().phase).toBe("PAUSED");
+    await page.waitForTimeout(700); // Ambience fades out; no ongoing effects.
+    await resetPeak(page);
+    await page.waitForTimeout(300);
+    expect(await peak(page)).toBeLessThan(0.0001);
+    host.command("end");
+    await expect.poll(() => host.state().phase).toBe("FINISHED");
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+    await page.evaluate(() => {
+      (window as any).__background = false;
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    // An explicit mute wins over starting another match or broadcast mode.
+    await page.locator("#sound").click();
+    await expect(panel).toHaveAttribute("data-status", "off");
+    const contexts = await page.evaluate(
+      () => (window as any).__contexts.length,
+    );
+    host.command("rematch_lobby");
+    await expect.poll(() => host.state().phase).toBe("WAITING");
+    await page.locator('[data-command="start"]').click();
+    await page.locator("#confirm").click();
+    await expect.poll(() => host.state().phase).toBe("COUNTDOWN");
+    await page.locator("#broadcast-mode").click();
+    await expect(page.locator("body")).toHaveClass(/broadcast-view/);
+    await expect(panel).toHaveAttribute("data-status", "off");
+    expect(await page.evaluate(() => (window as any).__contexts.length)).toBe(
+      contexts,
+    );
+    await page.locator("#watch-sound").click();
+    await expect(panel).toHaveAttribute("data-status", "on");
+  } finally {
+    if (!["WAITING", "FINISHED"].includes(host.state().phase))
+      host.command("end");
+    for (const ws of players) ws.close();
+    host.close();
+  }
+});
+
 test("broadcast audio: host/projector unlock, real signal, live volume, mute and official cues", async ({
   page,
 }) => {

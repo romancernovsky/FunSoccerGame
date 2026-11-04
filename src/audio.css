@@ -65,6 +65,9 @@
 .broadcast-view .audio-panel {
   display: none;
 }
+.broadcast-view[data-audio-status="blocked"] .watch-toolbar {
+  opacity: 1;
+}
 @media (max-width: 1100px) {
   .audio-panel {
     flex-direction: column;

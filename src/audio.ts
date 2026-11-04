@@ -79,13 +79,57 @@ export function synthesizeEffect(
   }
 }
 
-/** One opt-in audio source for a host/projector page, never for player phones. */
+/** Original stereo crowd bed. Its gate follows actual playing phases. */
+function stadiumAmbience(audio: AudioContext, output: AudioNode) {
+  const buffer = audio.createBuffer(2, audio.sampleRate * 6, audio.sampleRate);
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const data = buffer.getChannelData(channel);
+    for (let i = 0; i < data.length; i++) {
+      const phase = (i / data.length) * Math.PI * 2;
+      const swell = 0.75 + 0.15 * Math.sin(phase) + 0.1 * Math.sin(phase * 3);
+      // Fade the seam so a looping noise buffer never clicks.
+      const seam = Math.min(1, i / 2400, (data.length - 1 - i) / 2400);
+      data[i] = (Math.random() * 2 - 1) * swell * seam;
+    }
+  }
+  const source = audio.createBufferSource(),
+    filter = audio.createBiquadFilter(),
+    gain = audio.createGain();
+  source.buffer = buffer;
+  source.loop = true;
+  filter.type = "bandpass";
+  filter.frequency.value = 650;
+  filter.Q.value = 0.7;
+  gain.gain.value = 0;
+  source.connect(filter).connect(gain).connect(output);
+  source.start();
+  let active = false;
+  return {
+    setActive(next: boolean) {
+      if (next === active) return;
+      active = next;
+      gain.gain.cancelScheduledValues(audio.currentTime);
+      gain.gain.setTargetAtTime(next ? 0.13 : 0, audio.currentTime, 0.05);
+    },
+    stop() {
+      source.stop();
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    },
+  };
+}
+
+/** One audio source for a host/projector page, never for player phones. */
 export class MatchAudio {
   status: AudioStatus = "off";
   volume = 0.6;
   private wanted = false;
+  private mutedByUser = false;
+  private playing = false;
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
+  private ambience: ReturnType<typeof stadiumAmbience> | null = null;
   private voices = new Set<AudioScheduledSourceNode>();
   private pending = false;
   private attempt = 0;
@@ -95,13 +139,10 @@ export class MatchAudio {
 
   constructor(private changed: () => void) {
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) {
-        ++this.attempt;
-        this.pending = false;
-        this.stopVoices();
-        this.setGain(0);
-        if (this.wanted) this.publish("blocked");
-      } else this.recover();
+      // A presenter may switch to the meeting tab while sharing this one.
+      // Keep a running audio context audible; recover actual OS interruptions
+      // when the page becomes visible again.
+      if (!document.hidden) this.recover();
     });
     window.addEventListener("pageshow", () => this.recover());
     // An explicit previous opt-in is required; unrelated taps never enable audio.
@@ -113,30 +154,39 @@ export class MatchAudio {
 
   get ready() {
     return (
-      this.status === "on" &&
-      this.wanted &&
-      this.context?.state === "running" &&
-      !document.hidden
+      this.status === "on" && this.wanted && this.context?.state === "running"
     );
   }
   toggle() {
     if (this.ready || this.pending) this.mute();
-    else void this.activate(true, this.status === "blocked");
+    else {
+      this.mutedByUser = false;
+      void this.activate(true, this.status === "blocked");
+    }
   }
   test() {
     if (this.ready) this.play("test");
-    else if (!this.pending) void this.activate(true, this.status === "blocked");
+    else if (!this.pending) {
+      this.mutedByUser = false;
+      void this.activate(true, this.status === "blocked");
+    }
+  }
+  /** Call inside the host's start/resume/broadcast click, before any await. */
+  enableForMatch() {
+    if (!this.mutedByUser && !this.ready && !this.pending)
+      void this.activate(false, this.status === "blocked");
   }
   setVolume(value: number) {
     if (!Number.isFinite(value)) return;
     this.volume = Math.max(0, Math.min(1, value));
-    if (this.master && this.context && !document.hidden) {
+    if (this.master && this.context) {
       this.setGain(this.volume, true);
     }
     this.changed();
   }
   mute() {
     this.wanted = false;
+    this.mutedByUser = true;
     ++this.attempt;
     this.pending = false;
     this.releaseContext();
@@ -154,7 +204,18 @@ export class MatchAudio {
   private publish(status: AudioStatus) {
     if (this.status === status) return;
     this.status = status;
+    if (status === "on") this.syncAmbience();
     this.changed();
+  }
+  private syncAmbience() {
+    if (!this.ready || !this.context || !this.master) return;
+    try {
+      if (this.playing)
+        this.ambience ??= stadiumAmbience(this.context, this.master);
+      this.ambience?.setActive(this.playing);
+    } catch {
+      this.publish("blocked");
+    }
   }
   private session(on: boolean) {
     // Safari exposes this optional API. Playback routing avoids the ambient
@@ -203,13 +264,7 @@ export class MatchAudio {
         this.master.gain.value = this.volume;
         this.master.connect(context.destination);
         context.onstatechange = () => {
-          if (
-            this.context !== context ||
-            !this.wanted ||
-            this.pending ||
-            document.hidden
-          )
-            return;
+          if (this.context !== context || !this.wanted || this.pending) return;
           if (context.state === "running") this.publish("on");
           else {
             this.publish("blocked");
@@ -230,7 +285,7 @@ export class MatchAudio {
           );
         }),
       ]);
-      if (attempt !== this.attempt || !this.wanted || document.hidden) return;
+      if (attempt !== this.attempt || !this.wanted) return;
       if (context.state !== "running")
         throw Error("Audio is still interrupted");
       this.pending = false;
@@ -265,6 +320,8 @@ export class MatchAudio {
     this.voices.clear();
   }
   private releaseContext() {
+    this.ambience?.stop();
+    this.ambience = null;
     this.stopVoices();
     this.setGain(0);
     const context = this.context;
@@ -293,6 +350,11 @@ export class MatchAudio {
     }
   }
   observe(state: Snapshot) {
+    const playing = state.phase === "PLAYING" || state.phase === "GOLDEN_GOAL";
+    if (playing !== this.playing) {
+      this.playing = playing;
+      this.syncAmbience();
+    }
     if (this.lastEvent !== null && state.event.id !== this.lastEvent)
       this.play(state.event.kind);
     this.lastEvent = state.event.id;
