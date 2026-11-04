@@ -1,0 +1,738 @@
+/* Non-host pages are readable at phone sizes; gameplay has its own HUD rules. */
+.phone-join,
+.roster-empty-message {
+  display: none;
+}
+.public-page .joined-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.public-page .joined-top .check-mark {
+  float: none;
+  margin: 0;
+  flex: none;
+}
+.public-page .check-mark svg {
+  width: 26px;
+  height: 26px;
+}
+.public-page .joined-card h1 small {
+  display: block;
+  font:
+    700 16px "DM Sans",
+    sans-serif;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+.public-page .joined-card h1 > span {
+  display: block;
+}
+.public-page .lobby-note {
+  margin-top: 14px;
+}
+.public-page .how-to {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.public-page .how-to .lobby-control {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+.public-page .lobby-control > svg {
+  width: 24px;
+  height: 24px;
+  color: #dafa95;
+  flex: none;
+}
+.public-page .lobby-control > span {
+  min-width: 0;
+}
+.public-page .lobby-control strong {
+  display: block;
+  font-size: 16px;
+}
+.public-page .lobby-control small {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.public-page .lobby-control .keyboard-hint {
+  display: none;
+}
+@media (pointer: fine) {
+  .public-page .lobby-control .keyboard-hint {
+    display: inline;
+  }
+  .public-page .lobby-control .touch-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .public-page .public-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: auto;
+    min-height: 72px;
+    gap: 12px 8px;
+    padding: max(16px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right)) 12px
+      max(16px, env(safe-area-inset-left));
+  }
+  .public-page .public-header .brand {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 16px;
+    gap: 8px;
+    letter-spacing: -0.4px;
+  }
+  .public-page .public-header .brand-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 26px;
+    flex: none;
+  }
+  .public-page .public-header .brand small {
+    font-size: 10px;
+    letter-spacing: 0.7px;
+    line-height: 1.4;
+    margin-top: 3px;
+  }
+  .public-page .public-header .connection {
+    display: flex;
+    max-width: 110px;
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 14px;
+    letter-spacing: 0;
+    gap: 6px;
+    color: #bcd0d8;
+  }
+  .public-page .public-header nav {
+    grid-column: 1/-1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+    align-self: auto;
+  }
+  .public-page .public-header nav a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 9px 8px;
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  .public-page:has(.waiting-layout) .public-header nav {
+    display: none;
+  }
+  .public-page .public-content {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 22px max(16px, env(safe-area-inset-right)) 28px
+      max(16px, env(safe-area-inset-left));
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .public-page .public-content p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #bcd0d8;
+  }
+  .public-page .public-content small {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #b0c8d2;
+  }
+  .public-page .public-content .eyebrow {
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 1px;
+    color: #bdcfd5;
+  }
+  .public-page .public-content h1 {
+    font-size: clamp(36px, 8.5vw, 48px);
+    line-height: 1.05;
+  }
+  .public-page .public-content h2 {
+    line-height: 1.15;
+  }
+  .public-page .public-content .primary,
+  .public-page .public-content .secondary,
+  .public-page .public-content .danger {
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 16px;
+    line-height: 1.4;
+    letter-spacing: 0.3px;
+    text-align: center;
+  }
+  .public-page .public-content a.primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .public-page .public-content label {
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 20px 0 10px;
+  }
+  .public-page .public-content label small {
+    float: none;
+    display: block;
+    margin-top: 4px;
+  }
+  .public-page .public-content input:not([type="range"]) {
+    width: 100%;
+    min-height: 52px;
+    padding: 13px 14px;
+    font-size: 18px;
+  }
+  .public-page .public-content #name {
+    background: #0b202c;
+    border-color: #647d8b;
+  }
+  .public-page .public-content #name::placeholder {
+    color: #9db5c0;
+    opacity: 1;
+  }
+  .public-page .public-content #error,
+  .public-page .public-content .prediction-error {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .public-page .public-content .join-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 0;
+  }
+  .public-page .public-content .join-intro {
+    padding: 0;
+  }
+  .public-page .public-content .join-intro .eyebrow {
+    display: none;
+  }
+  .public-page .public-content .join-intro h1 {
+    font-size: 42px;
+    margin: 0;
+  }
+  .public-page .public-content .join-intro h1 br {
+    display: none;
+  }
+  .public-page .public-content .join-intro > p,
+  .public-page .public-content .intro-bottom {
+    display: none;
+  }
+  .public-page .public-content .join-form-card {
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+  }
+  .public-page .public-content .join-form-card > .eyebrow {
+    display: none;
+  }
+  .public-page .public-content .join-form-card h2 {
+    font-size: 32px;
+    margin: 0;
+  }
+  .public-page .public-content .team-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .public-page .public-content .team-option {
+    padding: 16px 12px;
+    min-height: 112px;
+    min-width: 0;
+  }
+  .public-page .public-content .team-option > span {
+    font-size: 26px;
+    margin: 0 0 5px;
+  }
+  .public-page .public-content .team-option strong {
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+  .public-page .public-content .team-option small {
+    font-size: 14px;
+  }
+  .public-page .public-content .form-note {
+    font-size: 14px;
+    margin-top: 14px;
+  }
+  .public-page .public-content:has(.join-layout) {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .public-page .public-content:has(.join-layout) .join-layout {
+    order: 1;
+  }
+  .public-page .public-content:has(.join-layout) .audience-entry {
+    order: 2;
+  }
+  .public-page
+    .public-content:has(.join-layout):not(:has(.team-option:enabled))
+    .audience-entry {
+    order: 0;
+  }
+  .public-page .public-content .audience-entry {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px;
+    margin: 0 0 20px;
+    gap: 14px;
+  }
+  .public-page .public-content .audience-entry .eyebrow {
+    font-size: 11px;
+  }
+  .public-page .public-content .audience-entry h2 {
+    font-size: 27px;
+    margin: 6px 0;
+  }
+  .public-page .public-content .audience-entry p {
+    font-size: 15px;
+  }
+  .public-page .public-content .ios-launch-tip {
+    padding: 16px;
+  }
+  .public-page .public-content .ios-launch-tip p {
+    font-size: 15px;
+  }
+  .public-page .public-content .waiting-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0;
+    align-items: stretch;
+  }
+  .public-page .public-content .joined-card {
+    min-width: 0;
+  }
+  .public-page .public-content .joined-card h1 {
+    margin: 10px 0 14px;
+    font-size: clamp(40px, 11vw, 52px);
+  }
+  .public-page .public-content .joined-card h1 small {
+    font-size: 14px;
+  }
+  .public-page .public-content .joined-card .check-mark {
+    width: 40px;
+    height: 40px;
+  }
+  .public-page .public-content .joined-card > p {
+    font-size: 16px;
+  }
+  .public-page .public-content .waiting-pill {
+    margin-top: 16px;
+    padding: 12px 16px;
+    font-size: 16px;
+    gap: 10px;
+  }
+  .public-page .public-content .how-to {
+    margin: 20px 0 0;
+    gap: 12px;
+  }
+  .public-page .public-content .how-to .lobby-control {
+    padding: 14px 10px;
+    border: 1px solid #bed8e426;
+    background: #122d3c88;
+    border-radius: 9px;
+    gap: 8px;
+  }
+  .public-page .public-content .lobby-control strong {
+    font-size: 16px;
+    line-height: 1.3;
+  }
+  .public-page .public-content .lobby-control small {
+    font-size: 14px;
+    line-height: 1.45;
+    margin-top: 4px;
+  }
+  .public-page .public-content .waiting-layout .team-card {
+    max-width: none;
+    width: 100%;
+  }
+  .public-page .public-content .teams-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin: 20px 0 0;
+  }
+  .public-page .public-content .team-title {
+    padding: 16px;
+    gap: 12px;
+  }
+  .public-page .public-content .team-title .eyebrow {
+    display: none;
+  }
+  .public-page .public-content .team-title h2 {
+    font-size: 30px;
+    margin: 0;
+    letter-spacing: 0.5px;
+  }
+  .public-page .public-content .team-emblem {
+    width: 34px;
+    height: 38px;
+    font-size: 30px;
+    flex: none;
+  }
+  .public-page .public-content .capacity {
+    font-size: 28px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .public-page .public-content .capacity small {
+    font-size: 16px;
+  }
+  .public-page .public-content .roster {
+    padding: 0 16px;
+  }
+  .public-page .public-content .roster-row {
+    min-height: 64px;
+    height: auto;
+    padding: 12px 0;
+    font-size: 16px;
+    gap: 12px;
+  }
+  .public-page .public-content .player-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  .public-page .public-content .player-label small {
+    font-size: 14px;
+    margin-top: 4px;
+    color: #b3cbd5;
+  }
+  .public-page .public-content .avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+    flex: none;
+  }
+  .public-page .public-content .player-dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+  }
+  .public-page .public-content .roster-row.empty {
+    display: none;
+  }
+  .public-page .public-content .roster-empty-message {
+    display: block;
+    padding: 18px 0;
+    font-size: 16px;
+    color: #b4cbd6;
+    line-height: 1.5;
+  }
+  .public-page .public-content .team-footer {
+    padding: 12px 16px;
+    gap: 12px;
+    font-size: 14px;
+    letter-spacing: 0;
+    color: #c3d8de;
+    flex-wrap: wrap;
+  }
+  .public-page .public-content .team-footer span {
+    font-size: 14px;
+    color: #b1c9d4;
+  }
+  .public-page .public-content .section-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    margin-bottom: 20px;
+  }
+  .public-page .public-content .section-top h1 {
+    font-size: 42px;
+  }
+  .public-page .public-content .section-top p {
+    margin-top: 10px;
+    font-size: 16px;
+  }
+  .public-page .public-content .lobby-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    text-align: left;
+    padding: 12px 0 0;
+  }
+  .public-page .public-content .status-pill {
+    font-size: 12px;
+    padding: 7px 10px;
+    letter-spacing: 0.4px;
+  }
+  .public-page .public-content .lobby-status strong {
+    font-size: 22px;
+  }
+  .public-page .public-content .lobby-status strong span {
+    display: inline;
+    font-size: 14px;
+  }
+  .public-page .public-content .lobby-status > small {
+    flex-basis: 100%;
+    font-size: 15px;
+  }
+  .public-page .public-content .lobby-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .public-page .public-content .join-card {
+    order: -1;
+    width: 100%;
+    background: #152d3a;
+    color: #edece3;
+    border: 1px solid #bed8e426;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    margin: 0;
+    text-align: center;
+  }
+  .public-page .public-content .join-card::before {
+    display: none;
+  }
+  .public-page .public-content .join-card h2,
+  .public-page .public-content .join-card > p,
+  .public-page .public-content .join-card > strong,
+  .public-page .public-content .join-card .qr-wrap,
+  .public-page .public-content .join-card .quick-facts {
+    display: none;
+  }
+  .public-page .public-content .join-card > .eyebrow {
+    display: none;
+  }
+  .public-page .public-content .join-card p {
+    font-size: 16px;
+  }
+  .public-page .public-content .phone-join {
+    display: inline-flex;
+    width: 100%;
+    margin: 12px 0 4px;
+  }
+  .public-page .public-content .join-link {
+    font-size: 15px;
+    color: #bcd0d8;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+  }
+  .public-page .public-content .rules-strip {
+    display: none;
+  }
+  .public-page .public-content > .scoreboard,
+  .public-page .public-content .lobby-main > .scoreboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 8px;
+    min-height: 96px;
+    padding: 12px;
+  }
+  .public-page .public-content .scoreboard .score-team {
+    font-size: 22px;
+    justify-content: center;
+    gap: 0;
+  }
+  .public-page .public-content .scoreboard .score-team > span {
+    display: none;
+  }
+  .public-page .public-content .scoreboard .score {
+    font-size: 36px;
+    gap: 8px;
+    padding: 3px 8px;
+    min-width: 0;
+  }
+  .public-page .public-content .scoreboard .clock-wrap {
+    grid-column: 1/-1;
+    justify-self: center;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .public-page .public-content .scoreboard .clock-wrap small {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  .public-page .public-content .scoreboard .clock-wrap strong {
+    font-size: 23px;
+  }
+  .public-page .public-content .match-heading {
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .public-page .public-content .match-heading .eyebrow {
+    font-size: 12px;
+  }
+  .public-page .public-content .match-bottom {
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-top: 14px;
+  }
+  .public-page .public-content .arena-overlay > p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .public-page .public-content .pitch-lobby-badge {
+    font-size: 11px;
+    padding: 6px 10px;
+    letter-spacing: 0.5px;
+  }
+  .public-page .public-content .pitch-vs {
+    font-size: 26px;
+  }
+  .public-page .public-content .pitch-subtitle,
+  .public-page .public-content .pitch-label,
+  .public-page .public-content .pitch-watermark {
+    display: none;
+  }
+  .public-page .public-content .crowd-card {
+    padding: 18px;
+    margin: 20px 0;
+  }
+  .public-page .public-content .crowd-heading {
+    gap: 8px;
+  }
+  .public-page .public-content .crowd-heading > strong {
+    font-size: 16px;
+  }
+  .public-page .public-content .crowd-lock {
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.3px;
+  }
+  .public-page .public-content .crowd-labels > span {
+    font-size: 14px;
+  }
+  .public-page .public-content .crowd-labels b {
+    font-size: 20px;
+  }
+  .public-page .public-content .crowd-labels small {
+    font-size: 14px;
+  }
+  .public-page .public-content .crowd-result {
+    font-size: 16px;
+  }
+  .public-page .public-content .audience-intro {
+    font-size: 16px;
+  }
+  .public-page .public-content.audience-main > h1 {
+    font-size: clamp(38px, 9.5vw, 52px);
+    margin: 12px 0 18px;
+  }
+  .public-page .public-content .audience-status {
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: 0.5px;
+  }
+  .public-page .public-content .audience-score > span {
+    font-size: 24px;
+  }
+  .public-page .public-content .audience-clock {
+    font-size: 18px;
+  }
+  .public-page .public-content .prediction-pick > .eyebrow {
+    font-size: 14px;
+    letter-spacing: 0.5px;
+  }
+  .public-page .public-content .prediction-option {
+    min-height: 152px;
+    padding: 18px 10px;
+  }
+  .public-page .public-content .prediction-option strong {
+    font-size: 30px;
+  }
+  .public-page .public-content .prediction-option small {
+    font-size: 14px;
+    letter-spacing: 0.3px;
+  }
+  .public-page .public-content .prediction-note,
+  .public-page .public-content .prediction-fineprint {
+    font-size: 14px;
+  }
+  .public-page .public-content .audience-connection {
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  .public-page .public-content .pin-panel {
+    width: 100%;
+    margin: 12px 0;
+    padding: 0;
+  }
+  .public-page .public-content .pin-panel h1 {
+    font-size: 40px;
+  }
+  .public-page .public-content .pin-panel p {
+    font-size: 16px;
+  }
+  .public-page .public-content .pin-panel > a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 12px;
+    min-height: 48px;
+    font-size: 16px;
+    white-space: normal;
+  }
+  .public-page .public-content .pin-panel > a:not(.primary) {
+    color: #bcd0d8;
+  }
+  .public-page .public-content .arena-wrap:has(.arena-overlay.finished) {
+    min-height: 240px;
+  }
+  .public-page .public-content .arena-overlay.finished {
+    background: #061724e8;
+    padding: 16px;
+    gap: 8px;
+  }
+  .public-page .public-content .arena-overlay.finished > .eyebrow {
+    font-size: 14px;
+  }
+  .public-page .public-content .arena-overlay.finished > strong {
+    font-size: 64px;
+    line-height: 1;
+  }
+  .public-page .public-content .arena-overlay.finished > h2 {
+    font-size: 28px;
+  }
+  .public-page > #app > footer {
+    padding: 20px max(16px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+    font-size: 12px;
+    gap: 16px;
+  }
+  .public-page > #app > footer button {
+    min-height: 44px;
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+  .public-page > #app > footer input[type="range"] {
+    height: 44px;
+    width: 120px;
+  }
+}

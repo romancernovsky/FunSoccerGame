@@ -1,3 +1,4 @@
+import { publicHeader } from "./public-header";
 import { displayCapabilities, showDisplayHelp } from "./display-mode";
 import { startAudience } from "./audience";
 import { predictionSummary } from "./prediction-view";
@@ -32,12 +33,14 @@ import {
 } from "./shared";
 import "./style.css";
 import "./mobile-game.css";
+import "./mobile-pages.css";
 const arrow =
   '<svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const route = location.pathname;
 const host = route === "/host",
   join = route === "/join";
+document.body.classList.toggle("public-page", !host);
 let state: Snapshot | null = null,
   ws: WebSocket | null = null,
   connected = false,
@@ -167,10 +170,16 @@ function connect() {
   ws.onerror = () => ws?.close();
 }
 function header() {
+  if (!host) return publicHeader(join ? "play" : "watch", connected);
   return `<header><a class="brand" href="/"><span class="brand-icon">✦</span><span>OFFICE<span class="brand-light"> / </span>ARENA<small>LEADERS VS WORKERS</small></span></a><nav><a class="${!host && !join ? "current" : ""}" href="/screen">Spectator</a><a class="${join ? "current" : ""}" href="/join">Join game <span>↗</span></a><a href="/predict">Predict the winner</a>${host ? '<a class="current" href="/host">Host console</a>' : ""}</nav><div class="connection"><i class="${connected ? "" : "offline"}"></i>${connected ? "LIVE CONNECTION" : "RECONNECTING"}</div></header>`;
 }
 function teamCard(team: Team, manage = false) {
   const ps = state?.players.filter((p) => p.team === team) ?? [];
+  const emptyMessage =
+    !manage && !ps.length
+      ? '<div class="roster-empty-message">No players yet. There’s room on this team.</div>'
+      : "";
+  const spots = (state?.maxTeamSize ?? 6) - ps.length;
   return `<section class="team-card ${team.toLowerCase()}"><div class="team-title"><span class="team-emblem">${team === "LEADERS" ? arrow : "✳"}</span><div><span class="eyebrow">${team === "LEADERS" ? "THE BIG IDEAS" : "THE REAL MVPs"}</span><h2>${team}</h2></div><span class="capacity">${ps.length}<small> / ${state?.maxTeamSize ?? 6}</small></span></div><div class="roster">${Array.from(
     { length: state?.maxTeamSize ?? 6 },
     (_, i) => {
@@ -181,10 +190,10 @@ function teamCard(team: Team, manage = false) {
     },
   ).join(
     "",
-  )}</div><div class="team-footer">${ps.length === (state?.maxTeamSize ?? 6) ? "TEAM FULL" : "OPEN FOR BUSINESS"}<span>${ps.filter((p) => p.connected).length} connected</span></div></section>`;
+  )}${emptyMessage}</div><div class="team-footer">${ps.length === (state?.maxTeamSize ?? 6) ? "TEAM FULL" : manage ? "OPEN FOR BUSINESS" : `${spots} ${spots === 1 ? "spot" : "spots"} available`}<span>${ps.filter((p) => p.connected).length} connected</span></div></section>`;
 }
 function qrCard() {
-  return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to play or predict</strong><a class="join-link" href="/join">${esc(location.host)}/join ↗</a><div class="quick-facts"><span>◷ 3 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
+  return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to play or predict</strong><a class="primary phone-join" href="/join">PLAY OR PREDICT</a><a class="join-link" href="/join">${esc(location.host)}/join</a><div class="quick-facts"><span>◷ 3 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
 }
 function scoreboard(player = false) {
   return `<div class="scoreboard${player ? " player-scoreboard" : ""}"><div class="score-team blue"><span>${arrow}</span> LEADERS</div><div class="score"><b id="score-l">${state?.score.LEADERS ?? 0}</b><span>:</span><b id="score-w">${state?.score.WORKERS ?? 0}</b></div><div class="score-team orange">WORKERS <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
@@ -304,16 +313,16 @@ function joinPanel() {
   if (p) {
     if (active())
       return `<div class="player-game">${playerToolbar()}${scoreboard(true)}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${p.team.toLowerCase()}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
-    return `<div class="waiting-layout"><section class="joined-card"><div class="check-mark">✓</div><span class="eyebrow">YOU ARE IN</span><h1>TEAM<br><span class="${p.team === "LEADERS" ? "blue" : "orange"}">${p.team}</span></h1><p>Welcome, <strong>${esc(p.name)}</strong>.<br>Get your game face on.</p><div class="waiting-pill"><i></i>Waiting for host…</div><div class="how-to"><span><b>↔</b>MOVE<small>Joystick / WASD</small></span><span><b>◉</b>PASS<small>Tap</small></span><span><b>↗</b>SHOOT<small>Hold & release</small></span><span><b>ϟ</b>DASH<small>Button / Shift</small></span></div></section>${teamCard(p.team)}</div>`;
+    return `<div class="waiting-layout"><section class="joined-card"><div class="joined-top"><span class="eyebrow">YOU ARE IN</span><div class="check-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 4 4L19 6"/></svg></div></div><h1><small>TEAM</small><span class="${p.team === "LEADERS" ? "blue" : "orange"}">${p.team}</span></h1><p>Welcome, <strong>${esc(p.name)}</strong>.</p><div class="waiting-pill" role="status"><i></i>Waiting for host…</div><p class="lobby-note">Keep this page open. You’ll enter the pitch when the host starts.</p><div class="how-to"><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span><strong>Move</strong><small><span class="touch-hint">Left joystick</span><span class="keyboard-hint">WASD / arrow keys</span></small></span></span><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="12" r="3"/><path d="M11 12h10m-5-5 5 5-5 5"/></svg><span><strong>Pass</strong><small><span class="touch-hint">Tap the ball button</span><span class="keyboard-hint">Tap Space</span></small></span></span><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="18" r="3"/><path d="M10 14 21 3M13 3h8v8"/></svg><span><strong>Shoot</strong><small>Hold, then release</small></span></span><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m4 5 7 7-7 7M12 5l7 7-7 7"/></svg><span><strong>Dash</strong><small><span class="touch-hint">Tap DASH</span><span class="keyboard-hint">Press Shift</span></small></span></span></div></section>${teamCard(p.team)}</div>`;
   }
   if (active())
-    return `<section class="pin-panel"><span class="eyebrow">THE PITCH IS BUSY</span><h1>Match in progress<span class="accent">.</span></h1><p>Please wait for the next game.</p><a class="primary" href="/predict">FOLLOW AUDIENCE PICKS ↗</a><a class="text-link" href="/screen">Watch the match ↗</a></section>`;
+    return `<section class="pin-panel"><span class="eyebrow">THE PITCH IS BUSY</span><h1>Match in progress<span class="accent">.</span></h1><p>Please wait for the next game.</p><a class="primary" href="/predict">FOLLOW AUDIENCE PICKS ${arrow}</a><a class="text-link" href="/screen">Watch the match ${arrow}</a></section>`;
   const display = displayCapabilities();
   const launchTip =
     display.appleTouch && !display.native && !display.standalone
       ? '<aside class="ios-launch-tip"><p><strong>More room on iPhone.</strong> Use a Home Screen web app to remove Safari bars. Set it up before joining.</p><button id="fullscreen-guide" class="secondary compact">HOW TO OPEN</button></aside>'
       : "";
-  return `${launchTip}<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br>Make some<br><em>noise.</em></h1><p>The three-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME <span>↗</span></button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
+  return `${launchTip}<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br> Make some<br> <em>noise.</em></h1><p>The three-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" aria-pressed="${selected === t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME ${arrow}</button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
 }
 function spectator() {
   if (active())
@@ -348,7 +357,7 @@ function render() {
     signature = sig;
     app.innerHTML =
       header() +
-      `<main class="${join && active() && me() ? "game-main" : ""}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main><footer><span>OFFICE ARENA <i>© 2026</i></span><span>A LITTLE RIVALRY. A LOT OF TEAM SPIRIT.</span><div>${!join ? `<button id="sound">${sound ? "◖ SOUND ON" : "◖ ENABLE SOUND"}</button><input id="volume" aria-label="Master volume" type="range" min="0" max="1" step="0.05" value="${volume}">` : ""}<span>BUILT FOR THE TEAM.</span></div></footer>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
+      `<main class="${join && active() && me() ? "game-main" : host ? "" : "public-content"}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main><footer><span>OFFICE ARENA <i>© 2026</i></span><span>A LITTLE RIVALRY. A LOT OF TEAM SPIRIT.</span><div>${!join ? `<button id="sound">${sound ? "◖ SOUND ON" : "◖ ENABLE SOUND"}</button><input id="volume" aria-label="Master volume" type="range" min="0" max="1" step="0.05" value="${volume}">` : ""}<span>BUILT FOR THE TEAM.</span></div></footer>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
     const n = document.querySelector<HTMLInputElement>("#name");
     if (n) n.value = name;
     bind();
