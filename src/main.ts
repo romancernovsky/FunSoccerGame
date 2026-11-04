@@ -406,7 +406,7 @@ function render() {
     app.innerHTML =
       header() +
       audioPanel() +
-      `<main class="${join && active() && me() ? "game-main" : host ? "" : "public-content"}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main><footer><span>OFFICE ARENA <i>© 2026</i></span><span>A LITTLE RIVALRY. A LOT OF TEAM SPIRIT.</span><div><span>BUILT FOR THE TEAM.</span></div></footer>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
+      `<main class="${join && active() && me() ? "game-main" : host ? "host-console" : "public-content"}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main><footer><span>OFFICE ARENA <i>© 2026</i></span><span>A LITTLE RIVALRY. A LOT OF TEAM SPIRIT.</span><div><span>BUILT FOR THE TEAM.</span></div></footer>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
     const n = document.querySelector<HTMLInputElement>("#name");
     if (n) n.value = name;
     bind();
