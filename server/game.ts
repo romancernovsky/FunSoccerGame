@@ -12,6 +12,7 @@ import {
   type Ball,
   type Input,
   type Snapshot,
+  type GameEvent,
   type Celebration,
 } from "../src/shared.js";
 const blank = (): Input => ({ x: 0, y: 0, action: false, dash: false });
@@ -32,6 +33,8 @@ export class Game {
   golden = false;
   ended = false;
   event = { id: 0, kind: "ready" };
+  private events: GameEvent[] = [];
+  private eventTime = 0;
   resumePhase: Phase = "PLAYING";
   pausedDeadline = 0;
   possessionTeam: Team | null = null;
@@ -62,8 +65,15 @@ export class Game {
     };
   }
   emit(kind: string, data?: unknown) {
-    this.event = { id: ++this.nextId, kind };
+    const event = this.sound(kind, this.eventTime);
+    this.event = { id: event.id, kind };
     this.log(kind, data);
+  }
+  private sound(kind: string, at: number) {
+    const event = { id: ++this.nextId, kind, at };
+    this.events.push(event);
+    if (this.events.length > 32) this.events.shift();
+    return event;
   }
   count(team: Team, connected = false) {
     return [...this.players.values()].filter(
@@ -71,6 +81,7 @@ export class Game {
     ).length;
   }
   join(name: unknown, team: unknown, now: number) {
+    this.eventTime = now;
     if (this.phase !== "WAITING")
       throw Error("MATCH IN PROGRESS. Please wait for the next game.");
     if (
@@ -117,6 +128,7 @@ export class Game {
     return { token, id };
   }
   reconnect(token: string, now: number) {
+    this.eventTime = now;
     const id = this.sessions.get(token),
       p = id && this.players.get(id);
     if (
@@ -131,6 +143,7 @@ export class Game {
     return p.id;
   }
   disconnect(id: string, now: number) {
+    this.eventTime = now;
     const p = this.players.get(id);
     if (p) {
       p.connected = false;
@@ -142,21 +155,32 @@ export class Game {
     }
   }
   remove(id: string) {
-    if (this.ball.owner === id) this.release(0.2, Date.now());
+    if (this.ball.owner === id) this.release(0.2, this.eventTime);
     this.players.delete(id);
     for (const [t, p] of this.sessions) if (p === id) this.sessions.delete(t);
   }
   positionPlayers() {
     for (const team of TEAMS) {
       const ps = [...this.players.values()].filter((p) => p.team === team);
-      ps.forEach((p, i) => {
+      const field = ps.filter((p) => !p.keeper);
+      ps.forEach((p) => {
+        // Evenly space each side on its own semicircle, leaving a gap at the
+        // halfway line. Single-player sides start opposite one another.
+        const index = field.indexOf(p);
+        const angle =
+          (team === "LEADERS" ? Math.PI : 0) +
+          (field.length <= 1
+            ? 0
+            : (-Math.PI * 7) / 18 +
+              (index * Math.PI * 7) / 9 / (field.length - 1));
         p.x = p.keeper
           ? team === "LEADERS"
             ? 70
             : 1130
-          : (team === "LEADERS" ? 310 : 890) +
-            (i % 2) * 65 * (team === "LEADERS" ? 1 : -1);
-        p.y = p.keeper ? 350 : 110 + ((i * 103) % 500);
+          : F.width / 2 + Math.cos(angle) * F.centerCircleRadius;
+        p.y = p.keeper
+          ? F.height / 2
+          : F.height / 2 + Math.sin(angle) * F.centerCircleRadius;
         p.fx = team === "LEADERS" ? 1 : -1;
         p.fy = 0;
         p.input = blank();
@@ -167,6 +191,7 @@ export class Game {
     }
   }
   command(action: string, data: Record<string, unknown>, now: number) {
+    this.eventTime = now;
     if (
       ["move", "keeper", "remove", "reset", "bots"].includes(action) &&
       this.phase !== "WAITING"
@@ -288,6 +313,7 @@ export class Game {
       throw Error("Teams are incomplete. Confirm to start anyway.");
   }
   reset() {
+    this.events = [];
     this.remaining = this.config.duration;
     this.score = { LEADERS: 0, WORKERS: 0 };
     this.ball = this.newBall();
@@ -303,6 +329,7 @@ export class Game {
     this.positionPlayers();
   }
   start(now: number) {
+    this.eventTime = now;
     this.predictions.locked = true;
     this.reset();
     this.phase = "COUNTDOWN";
@@ -322,6 +349,7 @@ export class Game {
     this.emit("match_finished", { score: this.score, ended: this.ended });
   }
   input(id: string, v: unknown, now: number) {
+    this.eventTime = now;
     const p = this.players.get(id);
     if (!p || !p.connected || !v || typeof v !== "object") return;
     const a = v as Input;
@@ -338,7 +366,10 @@ export class Game {
       p.input = blank();
       return;
     }
-    if (a.action && !p.input.action) p.chargeAt = now;
+    if (a.action && !p.input.action) {
+      p.chargeAt = now;
+      if (this.ball.owner === id) this.sound("shot_charge", now);
+    }
     if (!a.action && p.input.action) {
       if (this.ball.owner === id && p.chargeAt)
         this.release(clamp((now - p.chargeAt) / 1000, 0, 1), now);
@@ -347,11 +378,13 @@ export class Game {
     if (a.dash && !p.input.dash && now >= p.dashReady) {
       p.dashUntil = now + 170;
       p.dashReady = now + 2500;
+      this.sound("dash", now);
     }
     p.input = { ...a };
     p.inputAt = now;
   }
   release(charge: number, now: number) {
+    this.eventTime = now;
     const p = this.ball.owner && this.players.get(this.ball.owner);
     if (!p) return;
     let fx = p.fx,
@@ -391,6 +424,7 @@ export class Game {
     this.emit(charge < 0.22 ? "pass" : "shot");
   }
   goal(team: Team, now: number) {
+    this.eventTime = now;
     this.score[team]++;
     const shooter = this.ball.lastTouch
       ? this.players.get(this.ball.lastTouch)
@@ -405,8 +439,10 @@ export class Game {
     this.deadline = now + 3000;
     this.clearInputs();
     this.emit("goal_scored", this.celebration);
+    if (this.celebration.passes >= 3) this.sound("team_goal", now);
   }
   beginReorg(now: number) {
+    this.eventTime = now;
     const players = [...this.players.values()];
     const previous = new Map(
       players.map((p) => [p.id, { team: p.team, keeper: p.keeper }]),
@@ -495,6 +531,7 @@ export class Game {
     this.emit("reorg_started", this.reorg);
   }
   tick(dt: number, now: number) {
+    this.eventTime = now;
     for (const p of [...this.players.values()])
       if (!p.connected && now - p.disconnectedAt > this.config.grace * 1000)
         this.remove(p.id);
@@ -708,6 +745,7 @@ export class Game {
         this.possessionTeam = thief.team;
         this.passes = 0;
         this.passFrom = null;
+        this.sound("tackle", now);
       } else {
         ball.x = clamp(owner.x + owner.fx * 29, 9, 1191);
         ball.y = clamp(owner.y + owner.fy * 29, 9, 691);
@@ -751,12 +789,13 @@ export class Game {
             this.passes = 0;
             this.passFrom = null;
           }
-          this.emit("ball_bounce");
+          this.emit(p.keeper && this.inArea(p) ? "keeper_save" : "ball_bounce");
         }
       }
       if (ball.y < F.ballRadius || ball.y > F.height - F.ballRadius) {
         ball.y = clamp(ball.y, F.ballRadius, F.height - F.ballRadius);
         ball.vy *= -0.85;
+        if (Math.hypot(ball.vx, ball.vy) > 180) this.sound("wall_bounce", now);
       }
       const inGoal =
         ball.y - F.ballRadius > F.goalTop &&
@@ -774,6 +813,13 @@ export class Game {
       ) {
         ball.x = clamp(ball.x, F.ballRadius, F.width - F.ballRadius);
         ball.vx *= -0.85;
+        if (Math.hypot(ball.vx, ball.vy) > 180)
+          this.sound(
+            ball.y > F.goalTop - 70 && ball.y < F.goalBottom + 70
+              ? "near_miss"
+              : "wall_bounce",
+            now,
+          );
       }
     }
     const friction = Math.pow(0.985, dt * 30);
@@ -793,11 +839,23 @@ export class Game {
             Math.hypot(b.x - ball.x, b.y - ball.y),
         )[0];
       if (near) {
+        const completed =
+          this.possessionTeam === near.team &&
+          this.passFrom &&
+          this.passFrom !== near.id;
         if (this.possessionTeam !== near.team) {
           this.passes = 0;
           this.possessionTeam = near.team;
         } else if (this.passFrom && this.passFrom !== near.id) this.passes++;
         this.passFrom = null;
+        this.sound(
+          near.keeper && this.inArea(near)
+            ? "keeper_catch"
+            : completed
+              ? "pass_completed"
+              : "ball_control",
+          now,
+        );
         Object.assign(ball, {
           owner: near.id,
           lastTouch: near.id,
@@ -813,7 +871,7 @@ export class Game {
       (p.team === "LEADERS" ? p.x < 155 : p.x > 1045) && p.y > 205 && p.y < 495
     );
   }
-  snapshot(now: number): Snapshot {
+  snapshot(now: number, includeEvents = true): Snapshot {
     return {
       now,
       phase: this.phase,
@@ -830,6 +888,9 @@ export class Game {
       maxTeamSize: this.config.maxTeamSize,
       dev: this.config.dev,
       event: this.event,
+      ...(includeEvents
+        ? { events: this.events.filter((event) => now - event.at <= 1500) }
+        : {}),
     };
   }
 }

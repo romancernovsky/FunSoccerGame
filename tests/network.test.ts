@@ -73,6 +73,10 @@ test(
       await request("host", {}, "host_ready");
       assert.equal((await fetch("http://127.0.0.1:3102/healthz")).status, 200);
       assert.equal((await fetch("http://127.0.0.1:3102/host")).status, 200);
+      const audio = await fetch("http://127.0.0.1:3102/audio/whistle.mp3");
+      assert.equal(audio.status, 200);
+      assert.equal(audio.headers.get("content-type"), "audio/mpeg");
+      assert.ok((await audio.arrayBuffer()).byteLength > 1000);
       assert.match(
         (await request("command", { action: "bots" }, "error")).message,
         /disabled in production/,

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { WebSocket } from "ws";
+import { Game } from "../../server/game";
 import type { Snapshot } from "../../src/shared";
 test.use({ viewport: { width: 800, height: 600 } });
 
@@ -52,12 +53,14 @@ async function probe(page: Page) {
         }
         return gain;
       }
-      createOscillator() {
-        const source = super.createOscillator(),
+      createBufferSource() {
+        const source = super.createBufferSource(),
           start = source.start.bind(source);
-        source.start = (time) => {
+        source.start = (
+          ...args: Parameters<AudioBufferSourceNode["start"]>
+        ) => {
           this.starts++;
-          start(time);
+          start(...args);
         };
         return source;
       }
@@ -356,36 +359,45 @@ for (const failure of ["reject", "pending", "interrupted"] as const) {
   });
 }
 
-test("original pass, shot, countdown, goal, victory and Reorg effects produce finite audio", async ({
+test("every recorded cue produces finite audio without clipping", async ({
   page,
 }) => {
   await page.goto("/bet");
   const levels = await page.evaluate(async () => {
-    const url = "/src/audio.ts";
-    const { synthesizeEffect } = (await import(
-      url
-    )) as typeof import("../../src/audio");
-    const result: Record<string, { peak: number; rms: number }> = {};
-    for (const kind of [
-      "test",
-      "countdown",
-      "pass",
-      "shot",
-      "ball_bounce",
+    const url = "/src/recorded-audio.ts";
+    const {
+      EFFECTS,
+      loadRecordings,
+      playRecordedEffect,
+      createBroadcastMaster,
+    } = (await import(url)) as typeof import("../../src/recorded-audio");
+    const required = [
+      "match_started",
       "go",
+      "match_paused",
+      "match_resumed",
       "goal_scored",
-      "match_finished",
-      "final_minute",
-      "golden_goal_started",
+      "team_goal",
       "reorg_started",
       "reorg_kickoff",
-    ]) {
-      const context = new OfflineAudioContext(1, 96000, 48000);
-      synthesizeEffect(context, context.destination, kind);
+      "final_minute",
+      "last_seconds",
+      "golden_goal_started",
+      "match_finished",
+      "match_ended",
+    ];
+    if (required.some((kind) => !EFFECTS[kind]?.length))
+      throw Error("Missing a match transition cue");
+    const result: Record<string, { peak: number; rms: number }> = {};
+    for (const kind of Object.keys(EFFECTS)) {
+      const context = new OfflineAudioContext(2, 288000, 48000);
+      const bank = await loadRecordings(context);
+      playRecordedEffect(context, createBroadcastMaster(context), kind, bank);
       const data = (await context.startRendering()).getChannelData(0);
       let peak = 0,
         energy = 0;
       for (const sample of data) {
+        if (!Number.isFinite(sample)) throw Error(kind);
         peak = Math.max(peak, Math.abs(sample));
         energy += sample * sample;
       }
@@ -393,9 +405,175 @@ test("original pass, shot, countdown, goal, victory and Reorg effects produce fi
     }
     return result;
   });
+  expect(Object.keys(levels).length).toBeGreaterThan(20);
   for (const [kind, { peak, rms }] of Object.entries(levels)) {
     expect(peak, kind).toBeGreaterThan(0.005);
     expect(peak, kind).toBeLessThan(1);
-    expect(rms, kind).toBeGreaterThan(0.001);
+    expect(rms, kind).toBeGreaterThan(0.0003);
   }
+});
+
+test("recorded cues preserve action batches, skip stale history and sound every match transition", async ({
+  page,
+}) => {
+  await probe(page);
+  const g = new Game({ duration: 66, maxTeamSize: 6, grace: 20, dev: false });
+  const a = g.join("Alex", "LEADERS", 1000);
+  g.join("Sam", "WORKERS", 1000);
+  const initial = structuredClone(g.snapshot(1000));
+  const frames: Snapshot[] = [];
+  const capture = (now: number) =>
+    frames.push(structuredClone(g.snapshot(now)));
+  g.command("start", { confirm: true }, 1000);
+  capture(1000);
+  g.tick(0, 5000);
+  capture(5000);
+  g.ball.owner = a.id;
+  g.input(a.id, { x: 1, y: 0, action: true, dash: true }, 5100);
+  g.input(a.id, { x: 1, y: 0, action: false, dash: false }, 5200);
+  capture(5200);
+  g.command("pause", {}, 5300);
+  capture(5300);
+  g.command("resume", {}, 5400);
+  capture(5400);
+  g.tick(6, 11400);
+  capture(11400);
+  expect(g.snapshot(11400).phase).toBe("REORG");
+  g.command("pause", {}, 11500);
+  capture(11500);
+  g.command("resume", {}, 11600);
+  capture(11600);
+  let now = g.deadline;
+  g.tick(0, now);
+  capture(now);
+  now = g.deadline;
+  g.tick(0, now);
+  capture(now);
+  now += 34;
+  g.tick(1 / 30, now);
+  capture(now);
+  now += 100;
+  g.possessionTeam = "LEADERS";
+  g.passes = 3;
+  g.goal("LEADERS", now);
+  capture(now);
+  now = g.deadline;
+  g.tick(0, now);
+  capture(now);
+  now = g.deadline;
+  g.tick(0, now);
+  capture(now);
+  g.score.WORKERS = 1;
+  g.remaining = 0.01;
+  now += 34;
+  g.tick(0.02, now);
+  capture(now);
+  expect(g.snapshot(now).phase).toBe("GOLDEN_GOAL");
+  now += 100;
+  g.goal("WORKERS", now);
+  capture(now);
+  now = g.deadline;
+  g.tick(0, now);
+  capture(now);
+  g.command("rematch", {}, now + 100);
+  capture(now + 100);
+  g.command("end", { confirm: true }, now + 200);
+  capture(now + 200);
+  await page.goto("/bet");
+  await page.evaluate(async (initial) => {
+    const url = "/src/audio.ts";
+    const { MatchAudio } = (await import(
+      url
+    )) as typeof import("../../src/audio");
+    const engine = new MatchAudio(() => {});
+    (window as any).__engine = engine;
+    (window as any).__played = [];
+    const play = engine.play.bind(engine);
+    engine.play = (kind: string) => {
+      (window as any).__played.push(kind);
+      play(kind);
+    };
+    engine.observe(initial);
+    const button = document.createElement("button");
+    button.id = "enable-fixture-audio";
+    button.textContent = "Enable fixture audio";
+    button.onclick = () => engine.toggle();
+    document.body.append(button);
+  }, initial);
+  await page.locator("#enable-fixture-audio").click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__engine.ready))
+    .toBe(true);
+  await startMeter(page);
+  await page.waitForTimeout(650);
+  await resetPeak(page);
+  const result = await page.evaluate(
+    ({ frames, initial }) => {
+      const engine = (window as any).__engine;
+      // A freshly opened screen baselines existing cues instead of replaying them.
+      engine.observe(initial);
+      (window as any).__played = [];
+      for (const frame of frames) engine.observe(frame);
+      const played = [...(window as any).__played] as string[];
+      const last = frames.at(-1)!;
+      engine.observe(last);
+      engine.observe(last);
+      const duplicateCount = (window as any).__played.length - played.length;
+      const freshId =
+        Math.max(last.event.id, ...(last.events ?? []).map((e) => e.id)) + 1;
+      engine.observe({
+        ...last,
+        now: last.now + 2000,
+        event: { id: freshId, kind: "goal_scored" },
+        events: [{ id: freshId, kind: "goal_scored", at: last.now }],
+      });
+      const staleCount = (window as any).__played.length - played.length;
+      // The last-ten-seconds clap follows official remaining time and deduplicates.
+      for (let n = 10; n >= 1; n--) {
+        const frame = {
+          ...last,
+          phase: "PLAYING",
+          ended: false,
+          golden: false,
+          remaining: n,
+          events: [],
+          event: { id: freshId, kind: "ready" },
+        };
+        engine.observe(frame);
+        engine.observe(frame);
+      }
+      return {
+        played,
+        duplicateCount,
+        staleCount,
+        ticks: (window as any).__played.filter(
+          (k: string) => k === "last_seconds",
+        ).length,
+      };
+    },
+    { frames, initial },
+  );
+  for (const kind of [
+    "match_started",
+    "go",
+    "shot_charge",
+    "dash",
+    "pass",
+    "match_paused",
+    "match_resumed",
+    "reorg_started",
+    "reorg_kickoff",
+    "final_minute",
+    "goal_scored",
+    "team_goal",
+    "golden_goal_started",
+    "match_finished",
+    "match_ended",
+  ])
+    expect(result.played, kind).toContain(kind);
+  expect(result.duplicateCount).toBe(0);
+  expect(result.staleCount).toBe(0);
+  expect(result.ticks).toBe(10);
+  await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+  await page.evaluate(() => (window as any).__engine.mute());
 });

@@ -178,6 +178,7 @@ const server = createServer(async (req, res) => {
             ".webmanifest": "application/manifest+json",
             ".png": "image/png",
             ".ico": "image/x-icon",
+            ".mp3": "audio/mpeg",
           } as Record<string, string>
         )[extname(target)] ?? "application/octet-stream",
       "Cache-Control":
@@ -333,7 +334,7 @@ const simulation = setInterval(() => {
         c.ws.terminate();
         continue;
       }
-      send(c, "state", game.snapshot(Date.now()));
+      send(c, "state", game.snapshot(Date.now(), !c.id));
     }
   } catch (e) {
     console.error(

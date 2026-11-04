@@ -77,6 +77,7 @@ export type AudienceState = {
   predictions: PredictionSummary;
   pick: Team | null;
 };
+export type GameEvent = { id: number; kind: string; at: number };
 export type Snapshot = {
   now: number;
   phase: Phase;
@@ -93,6 +94,7 @@ export type Snapshot = {
   maxTeamSize: number;
   dev: boolean;
   event: { id: number; kind: string };
+  events?: GameEvent[];
 };
 export const FIELD = {
   width: 1200,
@@ -101,5 +103,6 @@ export const FIELD = {
   goalBottom: 455,
   radius: 17,
   ballRadius: 9,
+  centerCircleRadius: 100,
 };
 export const TEAMS: Team[] = ["LEADERS", "WORKERS"];

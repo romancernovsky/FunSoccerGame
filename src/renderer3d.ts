@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import type { Player, Snapshot } from "./shared";
+import { FIELD, type Player, type Snapshot } from "./shared";
 import { CAMERA_ELEVATION, cameraFrustum, type Camera } from "./camera";
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 function mat(color: string, metalness = 0) {
@@ -109,7 +109,7 @@ function pitchTexture() {
   g.lineTo(600, 700);
   g.stroke();
   g.beginPath();
-  g.arc(600, 350, 100, 0, Math.PI * 2);
+  g.arc(600, 350, FIELD.centerCircleRadius, 0, Math.PI * 2);
   g.stroke();
   for (const left of [true, false]) {
     g.strokeRect(left ? 0 : 1045, 205, 155, 290);

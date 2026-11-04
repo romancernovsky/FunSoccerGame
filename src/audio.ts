@@ -1,126 +1,39 @@
 import type { Snapshot } from "./shared";
-
+import {
+  EFFECTS,
+  preloadRecordings,
+  loadRecordings,
+  playRecordedEffect,
+  recordedAmbience,
+  createBroadcastMaster,
+  type SoundBank,
+} from "./recorded-audio";
 export type AudioStatus = "off" | "enabling" | "on" | "blocked" | "unavailable";
-const pitches: Record<string, number[]> = {
-  test: [523, 659, 784],
-  countdown: [660],
-  pass: [280],
-  shot: [140, 90],
-  ball_bounce: [200],
-  go: [440, 660, 880],
-  goal_scored: [523, 659, 784, 1047, 784, 1047],
-  match_finished: [784, 659, 523, 1047],
-  final_minute: [440, 440, 660],
-  golden_goal_started: [330, 660, 990],
-  reorg_started: [220, 165, 330, 440, 660, 880],
-  reorg_kickoff: [440, 660],
+const GAMEPLAY = new Set([
+  "pass",
+  "shot",
+  "shot_charge",
+  "ball_bounce",
+  "ball_control",
+  "wall_bounce",
+  "dash",
+  "tackle",
+  "pass_completed",
+  "keeper_save",
+  "keeper_catch",
+  "near_miss",
+]);
+const COOLDOWN: Record<string, number> = {
+  ball_bounce: 100,
+  wall_bounce: 150,
+  ball_control: 180,
+  dash: 140,
+  tackle: 200,
+  near_miss: 900,
+  keeper_save: 700,
+  shot_charge: 140,
+  pass_completed: 160,
 };
-
-/** Original effects, shared by live playback and offline signal verification. */
-export function synthesizeEffect(
-  audio: BaseAudioContext,
-  output: AudioNode,
-  kind: string,
-  track: (
-    source: AudioScheduledSourceNode,
-    nodes: AudioNode[],
-  ) => void = () => {},
-) {
-  const notes = pitches[kind];
-  if (!notes) return;
-  const start = audio.currentTime + 0.025;
-  notes.forEach((frequency, i) => {
-    const source = audio.createOscillator(),
-      gain = audio.createGain();
-    const at = start + i * 0.12;
-    const duration = kind === "countdown" ? 0.12 : 0.3;
-    source.type = kind === "goal_scored" ? "triangle" : "sine";
-    source.frequency.setValueAtTime(frequency, at);
-    gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(0.2, at + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + duration);
-    source.connect(gain).connect(output);
-    track(source, [gain]);
-    source.start(at);
-    source.stop(at + duration + 0.02);
-  });
-  if (kind === "match_finished" || kind === "go") {
-    const source = audio.createOscillator(),
-      gain = audio.createGain();
-    const at = start;
-    source.frequency.setValueAtTime(2700, at);
-    source.frequency.linearRampToValueAtTime(2350, at + 0.35);
-    gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(0.12, at + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.4);
-    source.connect(gain).connect(output);
-    track(source, [gain]);
-    source.start(at);
-    source.stop(at + 0.42);
-  }
-  if (kind === "goal_scored" || kind === "match_finished") {
-    const buffer = audio.createBuffer(
-      1,
-      audio.sampleRate * 1.5,
-      audio.sampleRate,
-    );
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++)
-      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-    const source = audio.createBufferSource(),
-      filter = audio.createBiquadFilter(),
-      gain = audio.createGain();
-    source.buffer = buffer;
-    filter.type = "bandpass";
-    filter.frequency.value = 900;
-    gain.gain.value = 0.25;
-    source.connect(filter).connect(gain).connect(output);
-    track(source, [filter, gain]);
-    source.start(start);
-  }
-}
-
-/** Original stereo crowd bed. Its gate follows actual playing phases. */
-function stadiumAmbience(audio: AudioContext, output: AudioNode) {
-  const buffer = audio.createBuffer(2, audio.sampleRate * 6, audio.sampleRate);
-  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-    const data = buffer.getChannelData(channel);
-    for (let i = 0; i < data.length; i++) {
-      const phase = (i / data.length) * Math.PI * 2;
-      const swell = 0.75 + 0.15 * Math.sin(phase) + 0.1 * Math.sin(phase * 3);
-      // Fade the seam so a looping noise buffer never clicks.
-      const seam = Math.min(1, i / 2400, (data.length - 1 - i) / 2400);
-      data[i] = (Math.random() * 2 - 1) * swell * seam;
-    }
-  }
-  const source = audio.createBufferSource(),
-    filter = audio.createBiquadFilter(),
-    gain = audio.createGain();
-  source.buffer = buffer;
-  source.loop = true;
-  filter.type = "bandpass";
-  filter.frequency.value = 650;
-  filter.Q.value = 0.7;
-  gain.gain.value = 0;
-  source.connect(filter).connect(gain).connect(output);
-  source.start();
-  let active = false;
-  return {
-    setActive(next: boolean) {
-      if (next === active) return;
-      active = next;
-      gain.gain.cancelScheduledValues(audio.currentTime);
-      gain.gain.setTargetAtTime(next ? 0.13 : 0, audio.currentTime, 0.05);
-    },
-    stop() {
-      source.stop();
-      source.disconnect();
-      filter.disconnect();
-      gain.disconnect();
-    },
-  };
-}
-
 /** One audio source for a host/projector page, never for player phones. */
 export class MatchAudio {
   status: AudioStatus = "off";
@@ -130,8 +43,14 @@ export class MatchAudio {
   private playing = false;
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
-  private ambience: ReturnType<typeof stadiumAmbience> | null = null;
+  private ambience: ReturnType<typeof recordedAmbience> | null = null;
   private voices = new Set<AudioScheduledSourceNode>();
+  private bank: SoundBank | null = null;
+  private crowdLevel = 0.12;
+  private lastPlayed = new Map<string, number>();
+  private phase = "";
+  private rhythm = "";
+  private finalSecond = 0;
   private pending = false;
   private attempt = 0;
   private lastEvent: number | null = null;
@@ -139,6 +58,7 @@ export class MatchAudio {
   private previousSessionType: string | undefined;
 
   constructor(private changed: () => void) {
+    void preloadRecordings().catch(() => {});
     document.addEventListener("visibilitychange", () => {
       // A presenter may switch to the meeting tab while sharing this one.
       // Keep a running audio context audible; recover actual OS interruptions
@@ -209,11 +129,15 @@ export class MatchAudio {
     this.changed();
   }
   private syncAmbience() {
-    if (!this.ready || !this.context || !this.master) return;
+    if (!this.ready || !this.context || !this.master || !this.bank) return;
     try {
       if (this.playing)
-        this.ambience ??= stadiumAmbience(this.context, this.master);
-      this.ambience?.setActive(this.playing);
+        this.ambience ??= recordedAmbience(
+          this.context,
+          this.master,
+          this.bank!,
+        );
+      this.ambience?.setLevel(this.playing ? this.crowdLevel : 0);
     } catch {
       this.publish("blocked");
     }
@@ -261,13 +185,14 @@ export class MatchAudio {
           return;
         }
         const context = (this.context = new Constructor());
-        this.master = context.createGain();
+        this.master = createBroadcastMaster(context);
         this.master.gain.value = this.volume;
-        this.master.connect(context.destination);
+
         context.onstatechange = () => {
           if (this.context !== context || !this.wanted || this.pending) return;
           if (context.state === "running") this.publish("on");
           else {
+            this.stopVoices();
             this.publish("blocked");
             this.recover();
           }
@@ -286,6 +211,7 @@ export class MatchAudio {
           );
         }),
       ]);
+      this.bank = await loadRecordings(context);
       if (attempt !== this.attempt || !this.wanted) return;
       if (context.state !== "running")
         throw Error("Audio is still interrupted");
@@ -323,6 +249,8 @@ export class MatchAudio {
   private releaseContext() {
     this.ambience?.stop();
     this.ambience = null;
+    this.bank = null;
+    this.lastPlayed.clear();
     this.stopVoices();
     this.setGain(0);
     const context = this.context;
@@ -334,37 +262,97 @@ export class MatchAudio {
     }
   }
   play(kind: string) {
-    if (!this.ready || !this.context || !this.master || this.voices.size > 64)
+    if (
+      !this.ready ||
+      !this.context ||
+      !this.master ||
+      !this.bank ||
+      !EFFECTS[kind] ||
+      this.voices.size > 48
+    )
       return;
+    const now = this.context.currentTime * 1000;
+    if (now - (this.lastPlayed.get(kind) ?? -Infinity) < (COOLDOWN[kind] ?? 0))
+      return;
+    this.lastPlayed.set(kind, now);
     try {
-      synthesizeEffect(this.context, this.master, kind, (source, nodes) => {
-        this.voices.add(source);
-        source.onended = () => {
-          this.voices.delete(source);
-          source.disconnect();
-          for (const node of nodes) node.disconnect();
-        };
-      });
+      playRecordedEffect(
+        this.context,
+        this.master,
+        kind,
+        this.bank,
+        (source, nodes) => {
+          this.voices.add(source);
+          source.onended = () => {
+            this.voices.delete(source);
+            source.disconnect();
+            for (const node of nodes) node.disconnect();
+          };
+        },
+      );
     } catch {
-      // An audio device change must not interrupt rendering or socket messages.
       this.publish("blocked");
     }
   }
   observe(state: Snapshot) {
     const playing = state.phase === "PLAYING" || state.phase === "GOLDEN_GOAL";
-    if (playing !== this.playing) {
-      this.playing = playing;
-      this.syncAmbience();
+    if (
+      this.phase !== state.phase &&
+      ["PAUSED", "REORG", "FINISHED", "WAITING"].includes(state.phase)
+    )
+      this.stopVoices();
+    this.phase = state.phase;
+    this.playing = playing;
+    this.crowdLevel = state.golden
+      ? 0.19
+      : state.remaining <= 60 || state.ball.x < 180 || state.ball.x > 1020
+        ? 0.16
+        : 0.12;
+    this.syncAmbience();
+    const events = state.events ?? [{ ...state.event, at: state.now }];
+    const latest = Math.max(state.event.id, ...events.map((e) => e.id));
+    if (this.lastEvent === null) this.lastEvent = latest;
+    else if (!this.pending) {
+      for (const event of events) {
+        if (
+          event.id <= this.lastEvent ||
+          state.now - event.at > 1500 ||
+          event.at > state.now
+        )
+          continue;
+        if (!playing && GAMEPLAY.has(event.kind)) continue;
+        this.play(
+          event.kind === "match_finished" && state.ended
+            ? "match_ended"
+            : event.kind,
+        );
+      }
+      this.lastEvent = Math.max(this.lastEvent, latest);
     }
-    if (this.lastEvent !== null && state.event.id !== this.lastEvent)
-      this.play(state.event.kind);
-    this.lastEvent = state.event.id;
-    // Use authoritative snapshots, not the WebGL animation loop, for the beeps.
     if (["COUNTDOWN", "KICKOFF_COUNTDOWN"].includes(state.phase)) {
       const n = Math.ceil((state.deadline - state.now) / 1000);
       const key = `${state.phase}:${state.deadline}:${n}`;
       if (key !== this.countdown && n >= 1 && n <= 3) this.play("countdown");
       this.countdown = key;
     } else this.countdown = "";
+    const second = Math.ceil(state.remaining);
+    if (state.remaining > 10) this.finalSecond = 0;
+    if (
+      playing &&
+      !state.golden &&
+      second >= 1 &&
+      second <= 10 &&
+      second !== this.finalSecond
+    ) {
+      this.finalSecond = second;
+      this.play("last_seconds");
+    }
+    const rhythm = state.golden
+      ? `golden:${Math.floor(state.now / 6000)}`
+      : `normal:${Math.floor(state.remaining / 6)}`;
+    if (playing && (state.golden || state.remaining > 10)) {
+      if (this.rhythm && rhythm !== this.rhythm) this.play("crowd_clap");
+      this.rhythm = rhythm;
+    } else this.rhythm = "";
   }
 }
