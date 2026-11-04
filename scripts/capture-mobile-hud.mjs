@@ -218,12 +218,14 @@ try {
       );
       await page.waitForFunction(() => {
         const canvas = document.querySelector("#arena-fx");
-        const height = canvas.getBoundingClientRect().height;
-        const expected = Math.max(
-          1.6,
-          Math.min(2.2, 440 / Math.max(160, height)),
+        const worldWidth = Number(
+          document.querySelector("#arena").dataset.cameraWidth,
         );
-        return Math.abs(Number(canvas.dataset.cameraZoom) - expected) < 0.07;
+        return (
+          canvas.dataset.cameraMode === "ball" &&
+          worldWidth > 740 &&
+          worldWidth < 915
+        );
       });
       await page.screenshot({ path: `${out}/${tag}-${label}.png` });
       metrics.push(
@@ -253,7 +255,7 @@ try {
         Number(document.querySelector("#arena-fx").dataset.cameraZoom) < 1.05,
     );
     await page.screenshot({ path: `${out}/${tag}-overview.png` });
-    await page.getByRole("button", { name: "Follow my player" }).tap();
+    await page.getByRole("button", { name: "Follow the ball" }).tap();
     await page.getByRole("button", { name: "Play without Safari bars" }).tap();
     await page.screenshot({ path: `${out}/${tag}-safari-help.png` });
     await writeFile(

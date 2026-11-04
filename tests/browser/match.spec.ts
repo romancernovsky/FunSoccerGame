@@ -346,7 +346,7 @@ test("mobile: short iPhone viewport, readable ball, player camera, honest fullsc
     await expect.poll(() => host.state?.phase).toBe("PLAYING");
     await expect(page.locator("#arena-fx")).toHaveAttribute(
       "data-camera-mode",
-      "player",
+      "ball",
     );
     await expect
       .poll(async () =>
@@ -402,7 +402,7 @@ test("mobile: short iPhone viewport, readable ball, player camera, honest fullsc
         ),
       )
       .toBeLessThan(1.05);
-    await page.getByRole("button", { name: "Follow my player" }).tap();
+    await page.getByRole("button", { name: "Follow the ball" }).tap();
     await expect
       .poll(async () =>
         Number(
@@ -492,5 +492,196 @@ test("mobile: short iPhone viewport, readable ball, player camera, honest fullsc
     );
   } finally {
     await ctx.close();
+  }
+});
+
+test("overhead action camera: follows a distant ball on phones, spectator and host", async ({
+  browser,
+}) => {
+  test.setTimeout(180000);
+  const host = await (await wire()).asHost(),
+    rival = await wire();
+  const opponent = await rival.request(
+    "join",
+    { name: "TEST Rival", team: "WORKERS" },
+    "identity",
+  );
+  const context = await browser.newContext({
+    viewport: { width: 568, height: 240 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  let drive: ReturnType<typeof setInterval> | undefined;
+  try {
+    await page.goto("/join");
+    await page.locator("#name").fill("TEST Maya");
+    await page.getByRole("button", { name: /JOIN GAME/ }).tap();
+    await expect(page.getByText("YOU ARE IN")).toBeVisible();
+    const local = host.state!.players.find((p) => p.name === "TEST Maya")!;
+    host.ws.send(
+      JSON.stringify({
+        type: "command",
+        data: { action: "keeper", id: local.id },
+      }),
+    );
+    await expect
+      .poll(() => host.state!.players.find((p) => p.id === local.id)?.keeper)
+      .toBe(true);
+    host.command("start");
+    await expect.poll(() => host.state?.phase).toBe("PLAYING");
+    const sendInput = (x: number, y: number) =>
+      rival.ws.send(
+        JSON.stringify({
+          type: "input",
+          data: { x, y, action: false, dash: false },
+        }),
+      );
+    let carrying = false;
+    drive = setInterval(() => {
+      const state = host.state!,
+        player = state.players.find((p) => p.id === opponent.id)!;
+      carrying ||= state.ball.owner === opponent.id;
+      const target = carrying ? { x: 1080, y: 610 } : state.ball;
+      const dx = target.x - player.x,
+        dy = target.y - player.y,
+        distance = Math.hypot(dx, dy);
+      sendInput(
+        distance > 8 ? dx / distance : 0,
+        distance > 8 ? dy / distance : 0,
+      );
+    }, 50);
+    await expect
+      .poll(
+        () => {
+          const p = host.state!.players.find((p) => p.id === opponent.id)!;
+          return carrying && p.x > 1040 && p.y > 580;
+        },
+        { timeout: 20000 },
+      )
+      .toBe(true);
+    clearInterval(drive);
+    drive = undefined;
+    sendInput(0, 0);
+    expect(host.state!.ball.owner).toBe(opponent.id);
+    expect(
+      Math.hypot(
+        host.state!.ball.x -
+          host.state!.players.find((p) => p.id === local.id)!.x,
+        host.state!.ball.y -
+          host.state!.players.find((p) => p.id === local.id)!.y,
+      ),
+    ).toBeGreaterThan(850);
+    for (const [label, width, height] of [
+      ["small", 568, 240],
+      ["short", 740, 260],
+      ["wide", 844, 390],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      await expect(page.locator("#arena-fx")).toHaveAttribute(
+        "data-camera-mode",
+        "ball",
+      );
+      await expect
+        .poll(async () =>
+          Number(
+            await page.locator("#arena").getAttribute("data-camera-width"),
+          ),
+        )
+        .toBeLessThan(915);
+      await expect(page.locator("#arena-fx")).toHaveAttribute(
+        "data-ball-visibility",
+        "visible",
+      );
+      await expect(page.locator("#arena-fx")).toHaveAttribute(
+        "data-player-visibility",
+        "direction",
+      );
+      const elevation = Number(
+        await page.locator("#arena").getAttribute("data-camera-elevation"),
+      );
+      expect(elevation).toBeGreaterThan(65);
+      expect(elevation).toBeLessThan(75);
+      const marker = await page.locator("#arena-fx").evaluate((canvas) => {
+        const data = (canvas as HTMLCanvasElement).dataset;
+        return {
+          x: Number(data.ballX),
+          y: Number(data.ballY),
+          ownX: Number(data.playerIndicatorX),
+          ownY: Number(data.playerIndicatorY),
+          rect: canvas.getBoundingClientRect().toJSON(),
+        };
+      });
+      expect(marker.x).toBeGreaterThan(12);
+      expect(marker.x).toBeLessThan(marker.rect.width - 12);
+      expect(marker.y).toBeGreaterThan(12);
+      expect(marker.y).toBeLessThan(marker.rect.height - 12);
+      expect(marker.ownX).toBeGreaterThanOrEqual(30);
+      expect(marker.ownY).toBeGreaterThanOrEqual(14);
+      await page.screenshot({
+        path: `artifacts/action-camera/phone-${label}.png`,
+      });
+    }
+    await page.getByRole("button", { name: "Show full field" }).tap();
+    await expect
+      .poll(async () =>
+        Number(
+          await page.locator("#arena-fx").getAttribute("data-camera-zoom"),
+        ),
+      )
+      .toBeLessThan(1.05);
+    await page.screenshot({
+      path: "artifacts/action-camera/phone-overview.png",
+    });
+    await page.getByRole("button", { name: "Follow the ball" }).tap();
+    await expect
+      .poll(async () =>
+        Number(await page.locator("#arena").getAttribute("data-camera-width")),
+      )
+      .toBeLessThan(915);
+    for (const route of ["/screen", "/host"]) {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(route);
+      await expect(page.locator("#arena-fx")).toHaveAttribute(
+        "data-camera-mode",
+        "ball",
+      );
+      await expect
+        .poll(async () =>
+          Number(
+            await page.locator("#arena").getAttribute("data-camera-width"),
+          ),
+        )
+        .toBeLessThan(915);
+      await page.screenshot({
+        path: `artifacts/action-camera/${route.slice(1)}.png`,
+        fullPage: true,
+      });
+      await page.locator("#camera-mode").click();
+      await expect(page.locator("#arena-fx")).toHaveAttribute(
+        "data-camera-mode",
+        "field",
+      );
+      await expect
+        .poll(async () =>
+          Number(
+            await page.locator("#arena-fx").getAttribute("data-camera-zoom"),
+          ),
+        )
+        .toBeLessThan(1.05);
+      await page.locator("#camera-mode").click();
+      await expect(page.locator("#arena-fx")).toHaveAttribute(
+        "data-camera-mode",
+        "ball",
+      );
+    }
+    expect(errors).toEqual([]);
+  } finally {
+    clearInterval(drive);
+    await context.close();
+    if (host.state && !["WAITING", "FINISHED"].includes(host.state.phase))
+      host.command("end");
   }
 });

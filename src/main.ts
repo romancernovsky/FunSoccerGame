@@ -17,7 +17,8 @@ import { Arena3D } from "./renderer3d";
 import { drawCelebration } from "./visuals";
 import {
   cameraTarget,
-  playerCameraTarget,
+  visibleHalfExtents,
+  type Viewport,
   smoothCamera,
   overview,
   type Camera,
@@ -203,7 +204,7 @@ function arena() {
   return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><span class="pitch-label">OFFICE ARENA / ${state?.phase === "WAITING" ? "PRE-MATCH" : "LIVE MATCH"}</span><span class="pitch-watermark">EASY TO PLAY. FUN TO WATCH.</span>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>AUDIENCE PICKS</span><b>${leaders}% LEADERS</b><b>${100 - leaders}% WORKERS</b></div>` : ""}</div>`;
 }
 function controls() {
-  return `<div class="mobile-controls"><div id="joystick" class="joystick" aria-label="Movement joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash" aria-label="Dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 5 7 7-7 7M3 12h14M17 5l5 7-5 7"/></svg><small>DASH</small></button><button id="shoot" class="shoot" aria-label="Pass or shoot: tap to pass, hold and release to shoot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m12 8 4 3-1.5 4h-5L8 11zM12 4v4M20 10l-4 1M17 19l-2.5-4M7 19l2.5-4M4 10l4 1"/></svg><small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>The whole pitch looks better in landscape.</p></div>`;
+  return `<div class="mobile-controls"><div id="joystick" class="joystick" aria-label="Movement joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash" aria-label="Dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 5 7 7-7 7M3 12h14M17 5l5 7-5 7"/></svg><small>DASH</small></button><button id="shoot" class="shoot" aria-label="Pass or shoot: tap to pass, hold and release to shoot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m12 8 4 3-1.5 4h-5L8 11zM12 4v4M20 10l-4 1M17 19l-2.5-4M7 19l2.5-4M4 10l4 1"/></svg><small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>Turn sideways to follow the action.</p></div>`;
 }
 function updateGameViewport() {
   const viewport = window.visualViewport;
@@ -295,7 +296,7 @@ function playerToolbar() {
         : "Fullscreen options"
       : `${playerFullscreen ? "Exit" : "Enter"} full screen`;
   const attackRight = me()?.team !== "WORKERS";
-  return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow my player" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "PLAYER" : "FIELD"}</span></button><span class="attack-direction ${me()?.team.toLowerCase() ?? ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
+  return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow the ball" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "BALL" : "FIELD"}</span></button><span class="attack-direction ${me()?.team.toLowerCase() ?? ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
 }
 function audioLabel() {
   return {
@@ -373,7 +374,7 @@ function joinPanel() {
 }
 function spectator() {
   if (active())
-    return `<div class="match-heading"><span class="eyebrow"><i class="live-dot"></i> ${state?.golden ? "GOLDEN GOAL" : "LIVE FROM THE OFFICE ARENA"}</span><button class="secondary compact" id="fullscreen">⛶ Full screen</button></div>${scoreboard()}${arena()}${state ? predictionSummary(state.predictions) : ""}<div class="match-bottom"><span><i class="live-dot"></i> ${state?.players.filter((p) => p.connected).length} PLAYERS ON THE PITCH</span><span>BIG IDEAS. BIGGER GOALS.</span></div>`;
+    return `<div class="match-heading"><span class="eyebrow"><i class="live-dot"></i> ${state?.golden ? "GOLDEN GOAL" : "LIVE FROM THE OFFICE ARENA"}</span><div class="spectator-view-tools"><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}" aria-label="${followCamera ? "Show full field" : "Follow the ball"}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="secondary compact" id="fullscreen">⛶ Full screen</button></div></div>${scoreboard()}${arena()}${state ? predictionSummary(state.predictions) : ""}<div class="match-bottom"><span><i class="live-dot"></i> ${state?.players.filter((p) => p.connected).length} PLAYERS ON THE PITCH</span><span>BIG IDEAS. BIGGER GOALS.</span></div>`;
   return `<div class="section-top"><div><span class="eyebrow"><i class="live-dot"></i> THE ALL-HANDS SHOWDOWN</span><h1>Business as <em>unusual.</em></h1><p>The meeting can wait. The match is almost on.</p></div><div class="lobby-status"><span class="status-pill">PRE-MATCH LOBBY</span><strong>${count("LEADERS") + count("WORKERS")} <span>/ ${(state?.maxTeamSize ?? 6) * 2} PLAYERS JOINED</span></strong><small>Waiting for host to start</small></div></div><div class="lobby-layout"><div class="lobby-main">${scoreboard()}${arena()}<div class="teams-grid">${TEAMS.map((t) => teamCard(t)).join("")}</div></div>${qrCard()}</div>${state ? predictionSummary(state.predictions) : ""}<div class="rules-strip"><span><b>01</b> SCAN & PICK A TEAM</span><i>→</i><span><b>02</b> WAIT FOR THE WHISTLE</span><i>→</i><span><b>03</b> GIVE THE OFFICE SOMETHING TO TALK ABOUT</span></div>`;
 }
 function render() {
@@ -785,11 +786,18 @@ function draw(time: number) {
   if (!r.width || !r.height) return;
   const phonePlayer =
     join && !!identity && matchMedia("(pointer: coarse)").matches;
-  const framingTarget =
-    phonePlayer && !playerOverview
-      ? playerCameraTarget(state, identity!, r.height)
-      : cameraTarget(state, host && hostReady && followCamera);
-  camera = smoothCamera(camera, framingTarget, dt);
+  const viewport = { width: r.width, height: r.height };
+  const follow = join && identity ? !playerOverview : followCamera;
+  const framingTarget = cameraTarget(state, follow, viewport);
+  camera = smoothCamera(
+    camera,
+    framingTarget,
+    dt,
+    viewport,
+    framingTarget.zoom > 1
+      ? { x: state.ball.x + 60, y: state.ball.y + 50 }
+      : undefined,
+  );
   world3d.render(state, time, dt, camera, identity, r.width, r.height);
   const fx = document.querySelector<HTMLCanvasElement>("#arena-fx")!,
     ctx = fx.getContext("2d")!;
@@ -811,10 +819,11 @@ function draw(time: number) {
   );
   if (phonePlayer) {
     world3d.drawMobileBall(ctx, identity!);
-    fx.dataset.cameraZoom = camera.zoom.toFixed(2);
-    fx.dataset.cameraMode = playerOverview ? "field" : "player";
   }
-  if (host && hostReady && followCamera) drawOverview(ctx, camera);
+  if (join && identity) world3d.drawPlayerLocation(ctx, identity, phonePlayer);
+  fx.dataset.cameraZoom = camera.zoom.toFixed(2);
+  fx.dataset.cameraMode = follow ? "ball" : "field";
+  if (host && hostReady && followCamera) drawOverview(ctx, camera, viewport);
   const overlay = document.querySelector<HTMLElement>("#arena-overlay")!;
   const phase = state.phase;
   let html = "";
@@ -904,7 +913,11 @@ function draw(time: number) {
       label.textContent = cooldown > 0 ? `${cooldown.toFixed(1)}s` : "DASH";
   }
 }
-function drawOverview(c: CanvasRenderingContext2D, view: Camera) {
+function drawOverview(
+  c: CanvasRenderingContext2D,
+  view: Camera,
+  viewport: Viewport,
+) {
   if (!state) return;
   c.save();
   c.translate(1060, 625);
@@ -944,11 +957,12 @@ function drawOverview(c: CanvasRenderingContext2D, view: Camera) {
   c.fill();
   c.strokeStyle = "#dbf995";
   c.lineWidth = 7;
+  const half = visibleHalfExtents(view, viewport);
   c.strokeRect(
-    view.x - 660 / view.zoom - 60,
-    view.y - 400 / view.zoom - 50,
-    1320 / view.zoom,
-    800 / view.zoom,
+    view.x - half.x - 60,
+    view.y - half.y - 50,
+    half.x * 2,
+    half.y * 2,
   );
   c.restore();
 }

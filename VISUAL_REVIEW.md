@@ -61,3 +61,11 @@ The critic's approval concerns screenshot-observable UI and accurate guidance. P
 ## Match timing update
 
 Default regulation is now three minutes (180 seconds), with Reorg at **01:00** remaining. The reveal and kickoff still pause the match clock, leaving one full minute of active play afterward. The final-minute cue is announced when play resumes. The accelerated Reorg browser check now uses a 66-second match to reach the event after six seconds; earlier 02:00 screenshots above describe the historical timing.
+
+## Overhead action camera
+
+The default camera now follows the ball on player, host and spectator screens from a fixed approximately 68° overhead angle. The normal view covers about 750–900 of the field’s 1200 world units in width, rather than fitting the pitch. It uses the actual canvas aspect ratio, a small velocity lead and responsive smoothing; fast shots widen framing modestly. Kickoffs, goals and pauses keep the close view. Lobby, Reorg assignments and full time use an overview; FIELD/BALL controls allow manual orientation. The host minimap now shows the actual projected camera footprint.
+
+Players outside the action view receive a compact edge-attached YOU arrow, separate from an avatar’s in-world badge. It stays clear of camera/fullscreen and touch controls. The existing high-contrast ball marker and fixed attack direction remain.
+
+Evidence: `artifacts/action-camera/phone-{small,short,wide}.png`, `phone-overview.png`, `screen.png` and `host.png` come from a genuine two-player match: real input moves a second TEST participant into possession and carries the ball more than 850 world units away from the local goalkeeper. Browser checks verify the ball’s visibility, the player edge cue, the overhead angle, action width and full-field toggles on each role. `artifacts/mobile-hud/overhead-final-{small,short,wide}.png` and `overhead-final-metrics.json` cover a genuine twelve-player PLAYING snapshot at 568×240, 740×260 and 844×390. The snapshot is held for still review; positions, roles, possession, scores and phases are not injected. Older critic scores above describe earlier camera versions; no new critic score is claimed. These are Chromium touch-emulated captures, not physical iPhone tests.

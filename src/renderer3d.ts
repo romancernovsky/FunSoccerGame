@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import type { Player, Snapshot } from "./shared";
-import type { Camera } from "./camera";
+import { CAMERA_ELEVATION, cameraFrustum, type Camera } from "./camera";
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 function mat(color: string, metalness = 0) {
   const key = color + metalness;
@@ -649,18 +649,25 @@ export class Arena3D {
     }
     if (this.clock === 0)
       this.ball.position.set(state.ball.x / 100, 0, state.ball.y / 100);
-    const aspect = width / Math.max(1, height),
-      half = 4.15 * Math.max(1, 1.65 / aspect);
-    this.camera.left = -half * aspect;
-    this.camera.right = half * aspect;
-    this.camera.top = half;
-    this.camera.bottom = -half;
+    const frustum = cameraFrustum({ width, height });
+    this.camera.left = -frustum.halfWidth / 100;
+    this.camera.right = frustum.halfWidth / 100;
+    this.camera.top = frustum.halfHeight / 100;
+    this.camera.bottom = -frustum.halfHeight / 100;
     this.camera.zoom = view.zoom;
     const cx = 6 + (view.x - 660) / 100,
       cz = 3.5 + (view.y - 400) / 100;
-    this.camera.position.set(cx, 12, cz + 10);
+    this.camera.position.set(cx, 19, cz + 7.5);
     this.camera.lookAt(cx, 0, cz);
     this.camera.updateProjectionMatrix();
+    this.renderer.domElement.dataset.cameraElevation = (
+      (CAMERA_ELEVATION * 180) /
+      Math.PI
+    ).toFixed(1);
+    this.renderer.domElement.dataset.cameraWidth = (
+      (frustum.halfWidth * 2) /
+      view.zoom
+    ).toFixed(1);
     const smoothing = 1 - Math.exp(-dt * 18);
     const live = new Set(state.players.map((p) => p.id));
     for (const [id, a] of this.actors)
@@ -840,16 +847,89 @@ export class Arena3D {
     c.canvas.dataset.ballCorePixels = "14";
     c.canvas.dataset.ballX = x.toFixed(1);
     c.canvas.dataset.ballY = y.toFixed(1);
+  }
+  drawPlayerLocation(
+    c: CanvasRenderingContext2D,
+    localId: string,
+    mobile: boolean,
+  ) {
     const local = this.actors.get(localId);
-    if (local) {
-      const head = this.project(
-        local.root.position.x,
-        0.8,
-        local.root.position.z,
-      );
-      c.canvas.dataset.playerX = ((head.x * this.width) / 1320).toFixed(1);
-      c.canvas.dataset.playerY = ((head.y * this.height) / 800).toFixed(1);
+    if (!local) return;
+    const head = this.project(
+      local.root.position.x,
+      0.8,
+      local.root.position.z,
+    );
+    const x = (head.x * this.width) / 1320,
+      y = (head.y * this.height) / 800;
+    const covered =
+      mobile && y > this.height - 112 && (x < 110 || x > this.width - 154);
+    const visible =
+      !covered &&
+      x >= 20 &&
+      x <= this.width - 20 &&
+      y >= 16 &&
+      y <= this.height - 20;
+    c.canvas.dataset.playerX = x.toFixed(1);
+    c.canvas.dataset.playerY = y.toFixed(1);
+    c.canvas.dataset.playerVisibility = visible ? "visible" : "direction";
+    if (visible) {
+      delete c.canvas.dataset.playerIndicatorX;
+      delete c.canvas.dataset.playerIndicatorY;
+      return;
     }
+    const dx = x - this.width / 2,
+      dy = y - this.height / 2;
+    const t = Math.min(
+      (this.width / 2 - 30) / Math.max(1, Math.abs(dx)),
+      (this.height / 2 - 14) / Math.max(1, Math.abs(dy)),
+      1,
+    );
+    let px = Math.max(30, Math.min(this.width - 30, this.width / 2 + dx * t));
+    const py = Math.max(
+      14,
+      Math.min(this.height - 14, this.height / 2 + dy * t),
+    );
+    // An edge-attached cue cannot be mistaken for another character's YOU badge.
+    if (mobile && py < 30) px = Math.max(80, Math.min(this.width - 80, px));
+    if (mobile && py > this.height - 112 && (px < 120 || px > this.width - 160))
+      px = Math.max(130, Math.min(this.width - 174, px));
+    c.canvas.dataset.playerIndicatorX = px.toFixed(1);
+    c.canvas.dataset.playerIndicatorY = py.toFixed(1);
+    c.save();
+    c.setTransform(
+      c.canvas.width / this.width,
+      0,
+      0,
+      c.canvas.height / this.height,
+      0,
+      0,
+    );
+    c.fillStyle = "#0b2435f0";
+    c.strokeStyle = "#dcff91";
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.roundRect(px - 29, py - 14, 58, 28, 7);
+    c.fill();
+    c.stroke();
+    c.save();
+    c.translate(px - 17, py);
+    c.rotate(Math.atan2(dy, dx));
+    c.strokeStyle = "#dcff91";
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(-7, 0);
+    c.lineTo(7, 0);
+    c.moveTo(2, -5);
+    c.lineTo(7, 0);
+    c.lineTo(2, 5);
+    c.stroke();
+    c.restore();
+    c.fillStyle = "#dcff91";
+    c.font = "800 10px sans-serif";
+    c.textAlign = "center";
+    c.fillText("YOU", px + 9, py + 4);
+    c.restore();
   }
   private project(x: number, y: number, z: number) {
     this.v.set(x, y, z).project(this.camera);

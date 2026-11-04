@@ -1,83 +1,101 @@
 import type { Snapshot } from "./shared";
 export type Camera = { x: number; y: number; zoom: number };
+export type Viewport = { width: number; height: number };
+export const CAMERA_ELEVATION = Math.atan2(19, 7.5);
+const reference: Viewport = { width: 1320, height: 800 };
 export const overview = (): Camera => ({ x: 660, y: 400, zoom: 1 });
 const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
-/** Broadcast framing in the renderer's 1320 × 800 coordinates. */
-export function cameraTarget(state: Snapshot, follow: boolean): Camera {
-  if (!follow || !["PLAYING", "GOLDEN_GOAL"].includes(state.phase))
+
+/** Orthographic half extents at zoom 1, in game units (100 units = 1m). */
+export function cameraFrustum(viewport: Viewport) {
+  const aspect = Math.max(0.25, viewport.width / Math.max(1, viewport.height));
+  const halfHeight = 415 * Math.max(1, 1.65 / aspect);
+  return { halfWidth: halfHeight * aspect, halfHeight };
+}
+/** Footprint on the ground; the overhead angle also affects vertical framing. */
+export function visibleHalfExtents(
+  view: Camera,
+  viewport: Viewport = reference,
+) {
+  const frustum = cameraFrustum(viewport);
+  return {
+    x: frustum.halfWidth / view.zoom,
+    y: frustum.halfHeight / view.zoom / Math.sin(CAMERA_ELEVATION),
+  };
+}
+function bound(view: Camera, viewport: Viewport) {
+  const half = visibleHalfExtents(view, viewport);
+  // Allow a little stadium beyond the touchline. Otherwise a corner ball ends
+  // up underneath phone controls while the camera tries to contain the pitch.
+  const x = Math.min(660, half.x * 0.55),
+    y = Math.min(400, half.y * 0.4);
+  return {
+    zoom: view.zoom,
+    x: clamp(view.x, x, 1320 - x),
+    y: clamp(view.y, y, 800 - y),
+  };
+}
+
+/** A close, fixed-orientation camera shared by players, host and projector. */
+export function cameraTarget(
+  state: Snapshot,
+  follow: boolean,
+  viewport: Viewport = reference,
+): Camera {
+  if (!follow || ["WAITING", "REORG", "FINISHED"].includes(state.phase))
     return overview();
   const ball = state.ball;
-  // Widen for fast shots and spread-out play; tighten around contested possession.
   const nearby = state.players.filter(
-    (p) => p.connected && Math.hypot(p.x - ball.x, p.y - ball.y) < 360,
+    (p) => p.connected && Math.hypot(p.x - ball.x, p.y - ball.y) < 300,
   );
   const spread = Math.max(
     0,
     ...nearby.map((p) => Math.hypot(p.x - ball.x, p.y - ball.y)),
   );
   const speed = Math.hypot(ball.vx, ball.vy);
-  const zoom = clamp(1.48 - spread / 1600 - speed / 3200, 1.12, 1.48);
-  const halfWidth = 660 / zoom,
-    halfHeight = 400 / zoom;
-  return {
-    zoom,
-    x: clamp(
-      ball.x + 60 + clamp(ball.vx * 0.12, -90, 90),
-      halfWidth,
-      1320 - halfWidth,
-    ),
-    y: clamp(
-      ball.y + 50 + clamp(ball.vy * 0.1, -55, 55),
-      halfHeight,
-      800 - halfHeight,
-    ),
-  };
+  const actionWidth = clamp(750 + spread * 0.18 + speed * 0.1, 750, 900);
+  // Fit the action's width, not the whole pitch or a fixed screen-height zoom.
+  // This is especially important on a very wide, short Safari viewport.
+  const zoom = clamp(
+    (cameraFrustum(viewport).halfWidth * 2) / actionWidth,
+    1.6,
+    4.8,
+  );
+  return bound(
+    {
+      zoom,
+      x: ball.x + 60 + clamp(ball.vx * 0.08, -70, 70),
+      y:
+        ball.y +
+        50 +
+        clamp(ball.vy * 0.07, -45, 45) +
+        visibleHalfExtents({ x: 0, y: 0, zoom }, viewport).y * 0.1,
+    },
+    viewport,
+  );
 }
+
 export function smoothCamera(
   current: Camera,
   target: Camera,
   dt: number,
+  viewport: Viewport = reference,
+  focus?: { x: number; y: number },
 ): Camera {
-  const pan = 1 - Math.exp(-Math.min(0.1, Math.max(0, dt)) * 4.5);
-  const zoom = 1 - Math.exp(-Math.min(0.1, Math.max(0, dt)) * 2.5);
-  const nextZoom = current.zoom + (target.zoom - current.zoom) * zoom;
-  return {
-    x: clamp(
-      current.x + (target.x - current.x) * pan,
-      660 / nextZoom,
-      1320 - 660 / nextZoom,
-    ),
-    y: clamp(
-      current.y + (target.y - current.y) * pan,
-      400 / nextZoom,
-      800 - 400 / nextZoom,
-    ),
-    zoom: nextZoom,
+  const step = Math.min(0.1, Math.max(0, dt));
+  const pan = 1 - Math.exp(-step * 9),
+    zoom = 1 - Math.exp(-step * 3.5);
+  const next = {
+    x: current.x + (target.x - current.x) * pan,
+    y: current.y + (target.y - current.y) * pan,
+    zoom: current.zoom + (target.zoom - current.zoom) * zoom,
   };
-}
-
-/** Phone play follows the controlled player, keeping orientation fixed. */
-export function playerCameraTarget(
-  state: Snapshot,
-  localId: string,
-  height: number,
-): Camera {
-  const player = state.players.find((p) => p.id === localId);
-  if (!player || !["PLAYING", "GOLDEN_GOAL"].includes(state.phase))
-    return overview();
-  // Preserve a useful character size when Safari leaves only a short viewport.
-  const zoom = clamp(440 / Math.max(160, height), 1.6, 2.2);
-  const ownBall = state.ball.owner === localId;
-  const leadX = ownBall
-    ? player.fx * 70
-    : clamp((state.ball.x - player.x) * 0.25, -100, 100);
-  const leadY = ownBall
-    ? player.fy * 50
-    : clamp((state.ball.y - player.y) * 0.2, -65, 65);
-  return {
-    x: clamp(player.x + 60 + leadX, 660 / zoom, 1320 - 660 / zoom),
-    y: clamp(player.y + 50 + leadY, 400 / zoom, 800 - 400 / zoom),
-    zoom,
-  };
+  if (focus) {
+    const half = visibleHalfExtents(next, viewport);
+    // Fast shots and network corrections cannot drag the ball out of view.
+    next.x = clamp(next.x, focus.x - half.x * 0.42, focus.x + half.x * 0.42);
+    next.y = clamp(next.y, focus.y - half.y * 0.52, focus.y + half.y * 0.52);
+  }
+  return bound(next, viewport);
 }
