@@ -40,9 +40,10 @@ import "./mobile-pages.css";
 const arrow =
   '<svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
 const app = document.querySelector<HTMLDivElement>("#app")!;
-const route = location.pathname;
+const route = location.pathname === "/predict" ? "/bet" : location.pathname;
+if (location.pathname === "/predict") history.replaceState(null, "", "/bet");
 const host = route === "/host",
-  join = route === "/join";
+  join = route === "/join" || route === "/";
 document.body.classList.toggle("public-page", !host);
 let state: Snapshot | null = null,
   ws: WebSocket | null = null,
@@ -60,7 +61,7 @@ let serverOffset = 0,
   charging = false,
   chargeStarted = 0;
 const matchAudio =
-  !join && route !== "/predict" ? new MatchAudio(updateAudioUI) : null;
+  !join && route !== "/bet" ? new MatchAudio(updateAudioUI) : null;
 const input: Input = { x: 0, y: 0, action: false, dash: false };
 let keys = new Set<string>();
 let joystick = { x: 0, y: 0 };
@@ -168,30 +169,16 @@ function connect() {
   ws.onerror = () => ws?.close();
 }
 function header() {
-  if (!host) return publicHeader(join ? "play" : "watch", connected);
-  return `<header><a class="brand" href="/"><span class="brand-icon">✦</span><span>OFFICE<span class="brand-light"> / </span>ARENA<small>LEADERS VS WORKERS</small></span></a><nav><a class="${!host && !join ? "current" : ""}" href="/screen">Spectator</a><a class="${join ? "current" : ""}" href="/join">Join game <span>↗</span></a><a href="/predict">Predict the winner</a>${host ? '<a class="current" href="/host">Host console</a>' : ""}</nav><div class="connection"><i class="${connected ? "" : "offline"}"></i>${connected ? "LIVE CONNECTION" : "RECONNECTING"}</div></header>`;
+  if (join && me()) return "";
+  if (!host) return publicHeader(join ? "play" : null, connected);
+  return `<header class="host-header" data-connected="${connected}"><a class="brand" href="/host">LEADERS <span>vs</span> WORKERS <small>HOST</small></a>${!connected ? '<span role="status">Reconnecting…</span>' : ""}</header>`;
 }
 function teamCard(team: Team, manage = false) {
   const ps = state?.players.filter((p) => p.team === team) ?? [];
-  const emptyMessage =
-    !manage && !ps.length
-      ? '<div class="roster-empty-message">No players yet. There’s room on this team.</div>'
-      : "";
-  const spots = (state?.maxTeamSize ?? 6) - ps.length;
-  return `<section class="team-card ${team.toLowerCase()}"><div class="team-title"><span class="team-emblem">${team === "LEADERS" ? arrow : "✳"}</span><div><span class="eyebrow">${team === "LEADERS" ? "THE BIG IDEAS" : "THE REAL MVPs"}</span><h2>${team}</h2></div><span class="capacity">${ps.length}<small> / ${state?.maxTeamSize ?? 6}</small></span></div><div class="roster">${Array.from(
-    { length: state?.maxTeamSize ?? 6 },
-    (_, i) => {
-      const p = ps[i];
-      return p
-        ? `<div class="roster-row"><span class="avatar">${esc(p.name.slice(0, 2).toUpperCase())}</span><span class="player-label">${esc(p.name)} ${p.keeper ? "🧤" : ""}<small>${p.bot ? "TEST PLAYER · " : ""}${p.connected ? "Connected" : Date.now() + serverOffset - p.disconnectedAt < 10000 ? "Reconnecting" : "Disconnected"}</small></span>${manage && state?.phase === "WAITING" ? `<div class="player-actions"><button title="${p.keeper ? "Remove" : "Assign"} goalkeeper" data-player="${p.id}" data-action="keeper">🧤</button><button title="Move team" data-player="${p.id}" data-action="move">⇄</button><button title="Remove player" data-player="${p.id}" data-action="remove">×</button></div>` : `<span class="player-dot ${p.connected ? "" : "away"}"></span>`}</div>`
-        : `<div class="roster-row empty"><span class="empty-avatar">+</span><span>Waiting for player<span class="slot">0${i + 1}</span></span></div>`;
-    },
-  ).join(
-    "",
-  )}${emptyMessage}</div><div class="team-footer">${ps.length === (state?.maxTeamSize ?? 6) ? "TEAM FULL" : manage ? "OPEN FOR BUSINESS" : `${spots} ${spots === 1 ? "spot" : "spots"} available`}<span>${ps.filter((p) => p.connected).length} connected</span></div></section>`;
+  return `<section class="team-card ${team.toLowerCase()}" aria-label="${team} roster"><div class="team-title"><h2>${team}</h2><span class="capacity">${ps.length}<small> / ${state?.maxTeamSize ?? 6}</small></span></div><div class="roster">${ps.map((p) => `<div class="roster-row"><span class="avatar">${esc(p.name.slice(0, 2).toUpperCase())}</span><span class="player-label">${esc(p.name)} ${p.keeper ? "🧤" : ""}<small>${p.bot ? "TEST PLAYER · " : ""}${p.connected ? "Connected" : Date.now() + serverOffset - p.disconnectedAt < 10000 ? "Reconnecting" : "Disconnected"}</small></span>${manage && state?.phase === "WAITING" ? `<div class="player-actions"><button title="${p.keeper ? "Remove" : "Assign"} goalkeeper" data-player="${p.id}" data-action="keeper">🧤</button><button title="Move team" data-player="${p.id}" data-action="move">⇄</button><button title="Remove player" data-player="${p.id}" data-action="remove">×</button></div>` : `<span class="player-dot ${p.connected ? "" : "away"}"></span>`}</div>`).join("")}${!ps.length ? '<div class="roster-empty-message">No players yet</div>' : ""}</div></section>`;
 }
 function qrCard() {
-  return `<div class="join-card"><span class="eyebrow">YOUR NEXT TEAM MEETING, UPGRADED</span><h2>Less talk.<br>More football.</h2><p>Pick a side. Rally your team.<br>Settle it on the pitch.</p><div class="qr-wrap"><canvas id="qr"></canvas><span class="qr-corner">${arrow}</span></div><strong>Scan to play or predict</strong><a class="primary phone-join" href="/join">PLAY OR PREDICT</a><a class="join-link" href="/join">${esc(location.host)}/join</a><div class="quick-facts"><span>◷ 3 minutes</span><span>♙ 12 players</span><span>▣ Any browser</span></div></div>`;
+  return `<div class="join-card"><h2>Scan to join</h2><div class="qr-wrap"><canvas id="qr"></canvas></div><a class="primary phone-join" href="/join">Play</a><a class="join-link" href="/join">${esc(location.host)}/join</a></div>`;
 }
 function scoreboard(player = false) {
   return `<div class="scoreboard${player ? " player-scoreboard" : ""}"><div class="score-team blue"><span>${arrow}</span> LEADERS</div><div class="score"><b id="score-l">${state?.score.LEADERS ?? 0}</b><span>:</span><b id="score-w">${state?.score.WORKERS ?? 0}</b></div><div class="score-team orange">WORKERS <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
@@ -201,7 +188,7 @@ function arena() {
   const leaders = predictions?.total
     ? Math.round((predictions.totals.LEADERS / predictions.total) * 100)
     : 0;
-  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><span class="pitch-label">OFFICE ARENA / ${state?.phase === "WAITING" ? "PRE-MATCH" : "LIVE MATCH"}</span><span class="pitch-watermark">EASY TO PLAY. FUN TO WATCH.</span>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>AUDIENCE PICKS</span><b>${leaders}% LEADERS</b><b>${100 - leaders}% WORKERS</b></div>` : ""}</div>`;
+  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>BETS</span><b>${leaders}% LEADERS</b><b>${100 - leaders}% WORKERS</b></div>` : ""}</div>`;
 }
 function controls() {
   return `<div class="mobile-controls"><div id="joystick" class="joystick" aria-label="Movement joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash" aria-label="Dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 5 7 7-7 7M3 12h14M17 5l5 7-5 7"/></svg><small>DASH</small></button><button id="shoot" class="shoot" aria-label="Pass or shoot: tap to pass, hold and release to shoot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m12 8 4 3-1.5 4h-5L8 11zM12 4v4M20 10l-4 1M17 19l-2.5-4M7 19l2.5-4M4 10l4 1"/></svg><small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>Turn sideways to follow the action.</p></div>`;
@@ -307,9 +294,9 @@ function audioLabel() {
     unavailable: "Sound unavailable",
   }[matchAudio?.status ?? "off"];
 }
-function audioPanel() {
-  if (!matchAudio) return "";
-  return `<section class="audio-panel" aria-label="Match audio"><div class="audio-description"><strong>Match sound</strong><span id="audio-status" role="status"></span></div><div class="audio-actions"><button id="sound" class="primary compact" data-audio-action="toggle" aria-pressed="${matchAudio.ready}">${audioLabel()}</button><button id="test-sound" class="secondary compact" data-audio-action="test">Test sound</button><label>Volume<input id="volume" data-audio-volume aria-label="Master volume" type="range" min="0" max="1" step="0.05" value="${matchAudio.volume}"></label></div></section>`;
+function audioPanel(embedded = false) {
+  if (!matchAudio || (!embedded && host && active())) return "";
+  return `<section class="audio-panel ${embedded ? "watch-audio" : ""}" aria-label="Match audio"><div class="audio-actions"><button id="sound" class="secondary compact" data-audio-action="toggle" aria-pressed="${matchAudio.ready}">${audioLabel()}</button><button id="test-sound" class="secondary compact" data-audio-action="test">Test sound</button><label>Volume<input id="volume" data-audio-volume aria-label="Master volume" type="range" min="0" max="1" step="0.05" value="${matchAudio.volume}"></label></div><span id="audio-status" role="status"></span></section>`;
 }
 function updateAudioUI() {
   if (!matchAudio) return;
@@ -337,46 +324,46 @@ function updateAudioUI() {
   const message = document.querySelector("#audio-status");
   if (message)
     message.textContent = {
-      off: "Enable sound on the display or tab you will broadcast.",
+      off: "",
       enabling: "Waiting for browser audio…",
       on:
         volume === 0
           ? "Volume is 0%. Raise the volume to hear the match."
-          : `Sound enabled · ${Math.round(volume * 100)}% volume. When broadcasting, include tab audio in your meeting.`,
-      blocked:
-        "Audio was blocked or interrupted. Tap Resume sound. Check device volume if it stays silent.",
-      unavailable:
-        "This browser could not start audio. Try Safari, Chrome or Edge.",
+          : `${Math.round(volume * 100)}% volume`,
+      blocked: "Tap Resume sound to continue.",
+      unavailable: "Audio unavailable in this browser.",
     }[status];
 }
 function watchToolbar() {
-  return `<div class="watch-toolbar"><span class="eyebrow"><i class="live-dot"></i> LIVE BROADCAST</span><div><button class="secondary compact" id="watch-sound" data-audio-action="toggle" aria-pressed="${matchAudio?.ready ?? false}">${audioLabel()}</button><button class="secondary compact" data-audio-action="test">Test sound</button><label class="watch-volume">Volume<input id="watch-volume" data-audio-volume aria-label="Broadcast volume" type="range" min="0" max="1" step="0.05" value="${matchAudio?.volume ?? 0.6}"></label><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "↙ Exit broadcast" : "⛶ Broadcast mode"}</button></div></div>`;
+  return `<div class="watch-toolbar">${audioPanel(true)}<div><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "Ball camera" : "Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "Exit broadcast" : "Broadcast"}</button></div></div>`;
 }
 function hostPanel() {
   if (!hostReady)
-    return `<section class="pin-panel"><span class="eyebrow">MATCH CONTROL</span><h1>Connecting to the control room…</h1><p>Your host console will open automatically.</p><div id="error" role="alert">${esc(error)}</div></section>`;
-  return `<div class="section-top host-console-heading"><div><span class="eyebrow">THE CONTROL ROOM</span><h1>Run the show<span class="accent">.</span></h1></div><a class="text-link" href="/screen" target="_blank">Open projector ↗</a></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="rematch_lobby" title="Keep teams and reopen audience predictions; start manually">REMATCH LOBBY</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("LEADERS") !== count("WORKERS") ? "⚠ Teams are uneven. The host decides when to start." : "Ready when you are. The match never starts automatically.") : `${state?.phase.replaceAll("_", " ")} · Official server timer`}</p><div id="error" role="alert">${esc(error)}</div>${state ? predictionSummary(state.predictions) : ""}<div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
+    return `<section class="pin-panel"><h1>Connecting…</h1><div id="error" role="alert">${esc(error)}</div></section>`;
+  return `<div class="section-top host-console-heading"><div><h1>Host</h1></div></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="rematch_lobby" title="Keep teams and reopen bets; start manually">REMATCH LOBBY</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("LEADERS") !== count("WORKERS") ? "⚠ Teams are uneven" : "") : ""}</p><div id="error" role="alert">${esc(error)}</div>${state?.predictions.total ? predictionSummary(state.predictions) : ""}<div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
 }
 function joinPanel() {
   const p = me();
   if (p) {
     if (active())
       return `<div class="player-game">${playerToolbar()}${scoreboard(true)}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${p.team.toLowerCase()}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
-    return `<div class="waiting-layout"><section class="joined-card"><div class="joined-top"><span class="eyebrow">YOU ARE IN</span><div class="check-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 4 4L19 6"/></svg></div></div><h1><small>TEAM</small><span class="${p.team === "LEADERS" ? "blue" : "orange"}">${p.team}</span></h1><p>Welcome, <strong>${esc(p.name)}</strong>.</p><div class="waiting-pill" role="status"><i></i>Waiting for host…</div><p class="lobby-note">Keep this page open. You’ll enter the pitch when the host starts.</p><div class="how-to"><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span><strong>Move</strong><small><span class="touch-hint">Left joystick</span><span class="keyboard-hint">WASD / arrow keys</span></small></span></span><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="12" r="3"/><path d="M11 12h10m-5-5 5 5-5 5"/></svg><span><strong>Pass</strong><small><span class="touch-hint">Tap the ball button</span><span class="keyboard-hint">Tap Space</span></small></span></span><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="18" r="3"/><path d="M10 14 21 3M13 3h8v8"/></svg><span><strong>Shoot</strong><small>Hold, then release</small></span></span><span class="lobby-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m4 5 7 7-7 7M12 5l7 7-7 7"/></svg><span><strong>Dash</strong><small><span class="touch-hint">Tap DASH</span><span class="keyboard-hint">Press Shift</span></small></span></span></div></section>${teamCard(p.team)}</div>`;
+    const teammates = state!.players.filter((q) => q.team === p.team);
+    return `<section class="waiting-layout simple-panel"><h1>You’re in</h1><p class="joined-identity"><strong>${esc(p.name)}</strong><span class="${p.team.toLowerCase()}">${p.team}${p.keeper ? " 🧤" : ""}</span></p><div class="waiting-pill" role="status"><i></i>Waiting for host…</div><div class="waiting-team"><h2>Your team <span>${teammates.length} / ${state!.maxTeamSize}</span></h2><ul>${teammates.map((q) => `<li>${esc(q.name)}${q.keeper ? " 🧤" : ""}${!q.connected ? "<small>Reconnecting…</small>" : ""}</li>`).join("")}</ul></div></section>`;
   }
   if (active())
-    return `<section class="pin-panel"><span class="eyebrow">THE PITCH IS BUSY</span><h1>Match in progress<span class="accent">.</span></h1><p>Please wait for the next game.</p><a class="primary" href="/predict">FOLLOW AUDIENCE PICKS ${arrow}</a><a class="text-link" href="/screen">Watch the match ${arrow}</a></section>`;
-  const display = displayCapabilities();
-  const launchTip =
-    display.appleTouch && !display.native && !display.standalone
-      ? '<aside class="ios-launch-tip"><div class="install-pitch"><img src="/icons/arena-192.png" alt="" width="44" height="44"><p><strong>Play without Safari bars.</strong><br>Add a shortcut before joining.</p></div><button id="fullscreen-guide" class="secondary compact" aria-haspopup="dialog" aria-label="Add to Home Screen: show setup guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 9H5v12h14V9h-3M12 15V2m-4 4 4-4 4 4"/></svg>ADD TO HOME SCREEN</button></aside>'
-      : "";
-  return `${launchTip}<aside class="audience-entry"><div><span class="eyebrow">${TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "TEAMS FULL · YOUR MOMENT ISN’T OVER" : "MORE OF A SIDELINE STRATEGIST?"}</span><h2>Pick a winner. Bring the noise.</h2><p>No spot needed. Predict the winning team before the host starts.</p></div><a class="primary" href="/predict">PREDICT THE WINNER ${arrow}</a></aside><div class="join-layout"><section class="join-intro"><span class="eyebrow"><i class="live-dot"></i> ONE MEETING. TWO TEAMS. NO EXCUSES.</span><h1>Pick a side.<br> Make some<br> <em>noise.</em></h1><p>The three-minute showdown your<br>calendar didn't see coming.</p><div class="intro-bottom">LEADERS <span>VS</span> WORKERS <small>EASY TO PLAY. HARD TO COORDINATE. FUN TO WATCH.</small></div></section><section class="join-form-card"><span class="eyebrow">YOUR SPOT ON THE PITCH</span><h2>Let's play.</h2><form id="join-form"><label for="name">YOUR NAME <small>Keep it short. Make it yours.</small></label><input id="name" autocomplete="off" maxlength="12" placeholder="e.g. Alex" required><label>CHOOSE YOUR TEAM</label><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" aria-pressed="${selected === t}" ${count(t) >= (state?.maxTeamSize ?? 6) ? "disabled" : ""}><span>${t === "LEADERS" ? arrow : "✳"}</span><strong>${t}</strong><small>${count(t)} / ${state?.maxTeamSize ?? 6} ${count(t) >= (state?.maxTeamSize ?? 6) ? "· FULL" : "players"}</small></button>`).join("")}</div><div id="error" role="alert">${esc(error)}</div><button class="primary" ${!connected || TEAMS.every((t) => count(t) >= (state?.maxTeamSize ?? 6)) ? "disabled" : ""}>JOIN GAME ${arrow}</button><p class="form-note">No account. No downloads. Just a little friendly rivalry.</p></form></section></div>`;
+    return `<section class="simple-panel join-unavailable"><h1>Match in progress</h1><p>Next game soon.</p><a class="secondary" href="/bet">Bet</a></section>`;
+  const capacity = state?.maxTeamSize ?? 6;
+  if (count(selected) >= capacity) {
+    const available = TEAMS.find((t) => count(t) < capacity);
+    if (available) selected = available;
+  }
+  const full = TEAMS.every((t) => count(t) >= capacity);
+  return `<section class="join-layout simple-panel"><h1>Play</h1><form id="join-form"><label for="name">Your name</label><input id="name" name="name" autocomplete="nickname" autocapitalize="words" maxlength="12" placeholder="Name" required><fieldset><legend>Team</legend><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" aria-pressed="${selected === t}" ${count(t) >= capacity ? "disabled" : ""}><strong>${t}</strong><small>${count(t)} / ${capacity}${count(t) >= capacity ? " · Full" : ""}</small></button>`).join("")}</div></fieldset><div id="error" role="alert">${esc(error)}</div><button class="primary" type="submit" ${!connected || full ? "disabled" : ""}>Play</button>${full ? '<p class="join-full" role="status">Teams full. <a href="/bet">Bet on the winner</a></p>' : ""}</form></section>`;
 }
 function spectator() {
   if (active())
-    return `<div class="match-heading"><span class="eyebrow"><i class="live-dot"></i> ${state?.golden ? "GOLDEN GOAL" : "LIVE FROM THE OFFICE ARENA"}</span><div class="spectator-view-tools"><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}" aria-label="${followCamera ? "Show full field" : "Follow the ball"}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="secondary compact" id="fullscreen">⛶ Full screen</button></div></div>${scoreboard()}${arena()}${state ? predictionSummary(state.predictions) : ""}<div class="match-bottom"><span><i class="live-dot"></i> ${state?.players.filter((p) => p.connected).length} PLAYERS ON THE PITCH</span><span>BIG IDEAS. BIGGER GOALS.</span></div>`;
-  return `<div class="section-top"><div><span class="eyebrow"><i class="live-dot"></i> THE ALL-HANDS SHOWDOWN</span><h1>Business as <em>unusual.</em></h1><p>The meeting can wait. The match is almost on.</p></div><div class="lobby-status"><span class="status-pill">PRE-MATCH LOBBY</span><strong>${count("LEADERS") + count("WORKERS")} <span>/ ${(state?.maxTeamSize ?? 6) * 2} PLAYERS JOINED</span></strong><small>Waiting for host to start</small></div></div><div class="lobby-layout"><div class="lobby-main">${scoreboard()}${arena()}<div class="teams-grid">${TEAMS.map((t) => teamCard(t)).join("")}</div></div>${qrCard()}</div>${state ? predictionSummary(state.predictions) : ""}<div class="rules-strip"><span><b>01</b> SCAN & PICK A TEAM</span><i>→</i><span><b>02</b> WAIT FOR THE WHISTLE</span><i>→</i><span><b>03</b> GIVE THE OFFICE SOMETHING TO TALK ABOUT</span></div>`;
+    return `<div class="match-heading"><span class="eyebrow">${state?.golden ? "GOLDEN GOAL" : "LIVE"}</span><div class="spectator-view-tools"><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}" aria-label="${followCamera ? "Show full field" : "Follow the ball"}">${followCamera ? "Ball camera" : "Full field"}</button><button class="secondary compact" id="fullscreen">Full screen</button></div></div>${scoreboard()}${arena()}`;
+  return `<div class="section-top"><h1>LEADERS <span class="accent">vs</span> WORKERS</h1><div class="lobby-status"><strong>${count("LEADERS") + count("WORKERS")} / ${(state?.maxTeamSize ?? 6) * 2}</strong><small>Waiting for host</small></div></div><div class="lobby-layout"><div class="lobby-main"><div class="teams-grid">${TEAMS.map((t) => teamCard(t)).join("")}</div></div>${qrCard()}</div>`;
 }
 function render() {
   if (!state) return;
@@ -407,7 +394,7 @@ function render() {
     app.innerHTML =
       header() +
       audioPanel() +
-      `<main class="${join && active() && me() ? "game-main" : host ? "host-console" : "public-content"}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main><footer><span>OFFICE ARENA <i>© 2026</i></span><span>A LITTLE RIVALRY. A LOT OF TEAM SPIRIT.</span><div><span>BUILT FOR THE TEAM.</span></div></footer>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
+      `<main class="${join && active() && me() ? "game-main" : host ? "host-console" : "public-content"}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
     const n = document.querySelector<HTMLInputElement>("#name");
     if (n) n.value = name;
     bind();
@@ -477,9 +464,6 @@ function confirmCommand(action: string) {
   dialog.addEventListener("cancel", () => dialog.remove());
 }
 function bind() {
-  document
-    .querySelector("#fullscreen-guide")
-    ?.addEventListener("click", () => showDisplayHelp(true, false));
   document.querySelector("#player-camera")?.addEventListener("click", () => {
     stopInput();
     playerOverview = !playerOverview;
@@ -517,14 +501,11 @@ function bind() {
     (b) =>
       (b.onclick = () => {
         selected = b.dataset.team as Team;
-        document
-          .querySelectorAll("[data-team]")
-          .forEach((t) =>
-            t.classList.toggle(
-              "selected",
-              (t as HTMLElement).dataset.team === selected,
-            ),
-          );
+        document.querySelectorAll("[data-team]").forEach((t) => {
+          const current = (t as HTMLElement).dataset.team === selected;
+          t.classList.toggle("selected", current);
+          t.setAttribute("aria-pressed", String(current));
+        });
       }),
   );
   document
@@ -843,10 +824,9 @@ function draw(time: number) {
     drawCelebration(ctx, time, true);
   }
   if (phase === "WAITING")
-    html = `<span class="pitch-lobby-badge"><i></i> THE STAGE IS SET</span><span class="pitch-vs"><b>LEADERS</b><i>VS</i><b>WORKERS</b></span><span class="pitch-subtitle">BRING YOUR TEAM. LEAVE YOUR JOB TITLE.</span>`;
+    html = `<span class="pitch-vs"><b>LEADERS</b><i>VS</i><b>WORKERS</b></span>`;
   if (phase === "PAUSED")
-    html =
-      '<span class="eyebrow">TAKE A BREATHER</span><strong>PAUSED</strong><p>Waiting for the host to resume</p>';
+    html = "<strong>PAUSED</strong><p>Waiting for the host to resume</p>";
   if (phase === "GOAL" && state.celebration) {
     const c = state.celebration;
     html = `<span class="eyebrow">${c.team}</span><strong class="goal-word">GOOOAL!</strong><p>⚽ ${esc(c.scorer)}</p>${c.passes >= 3 ? `<div class="team-goal">🤝 TEAM GOAL · ${c.passes} PASSES</div>` : ""}`;
@@ -858,7 +838,7 @@ function draw(time: number) {
       : state.score.LEADERS === state.score.WORKERS
         ? "A MATCH TO REMEMBER"
         : `${state.score.LEADERS > state.score.WORKERS ? "LEADERS" : "WORKERS"} WIN!`;
-    html = `<span class="eyebrow">${state.ended ? "MATCH ENDED BY HOST" : "FULL TIME"}</span><strong>${state.score.LEADERS} — ${state.score.WORKERS}</strong><h2>${state.ended ? "" : "🏆 "}${winner}</h2><p>Same office. New bragging rights.</p>${!join && state.predictions.winner && state.predictions.total ? `<div class="audience-final">${state.predictions.totals[state.predictions.winner]} OF ${state.predictions.total} AUDIENCE MEMBERS CALLED IT!</div>` : ""}`;
+    html = `<span class="eyebrow">${state.ended ? "MATCH ENDED BY HOST" : "FULL TIME"}</span><strong>${state.score.LEADERS} — ${state.score.WORKERS}</strong><h2>${state.ended ? "" : "🏆 "}${winner}</h2>${!join && state.predictions.winner && state.predictions.total ? `<div class="audience-final">${state.predictions.totals[state.predictions.winner]} OF ${state.predictions.total} WINNING BETS</div>` : ""}`;
     drawConfetti(ctx, time);
   }
   if (phase === "GOLDEN_GOAL")
@@ -974,10 +954,8 @@ function drawConfetti(c: CanvasRenderingContext2D, t: number) {
   drawCelebration(c, t, state?.celebration?.team === "LEADERS");
 }
 
-app.innerHTML =
-  header() +
-  '<main class="loading"><span class="eyebrow">OFFICE ARENA</span><h1>Warming up the pitch…</h1></main>';
-if (route === "/predict") startAudience(app);
+app.innerHTML = header() + '<main class="loading"><h1>Connecting…</h1></main>';
+if (route === "/bet") startAudience(app);
 else {
   connect();
   requestAnimationFrame(draw);

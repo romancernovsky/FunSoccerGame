@@ -143,6 +143,7 @@ test(
             ...extra,
           }),
         });
+      assert.equal((await fetch("http://127.0.0.1:3102/bet")).status, 200);
       assert.equal((await fetch("http://127.0.0.1:3102/predict")).status, 200);
       assert.equal((await pick("LEADERS")).status, 200);
       const repeated = (await (await pick("LEADERS")).json()) as any;

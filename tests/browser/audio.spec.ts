@@ -190,7 +190,7 @@ test("host start unlocks sound, background broadcast stays audible, pauses are q
     expect(await page.evaluate(() => (window as any).__contexts.length)).toBe(
       contexts,
     );
-    await page.locator("#watch-sound").click();
+    await page.locator("#sound").click();
     await expect(panel).toHaveAttribute("data-status", "on");
   } finally {
     if (!["WAITING", "FINISHED"].includes(host.state().phase))
@@ -248,13 +248,13 @@ test("broadcast audio: host/projector unlock, real signal, live volume, mute and
           path: "artifacts/audio/host-controls.png",
           fullPage: true,
         });
-        await expect(page.locator("#watch-sound")).toHaveAttribute(
+        await expect(page.locator("#sound")).toHaveAttribute(
           "aria-pressed",
           "true",
         );
-        await page.locator("#watch-sound").click();
+        await page.locator("#sound").click();
         await expect(panel).toHaveAttribute("data-status", "off");
-        await page.locator("#watch-sound").click();
+        await page.locator("#sound").click();
         await expect(panel).toHaveAttribute("data-status", "on");
         await startMeter(page);
       }
@@ -359,7 +359,7 @@ for (const failure of ["reject", "pending", "interrupted"] as const) {
 test("original pass, shot, countdown, goal, victory and Reorg effects produce finite audio", async ({
   page,
 }) => {
-  await page.goto("/predict");
+  await page.goto("/bet");
   const levels = await page.evaluate(async () => {
     const url = "/src/audio.ts";
     const { synthesizeEffect } = (await import(
@@ -371,6 +371,7 @@ test("original pass, shot, countdown, goal, victory and Reorg effects produce fi
       "countdown",
       "pass",
       "shot",
+      "ball_bounce",
       "go",
       "goal_scored",
       "match_finished",

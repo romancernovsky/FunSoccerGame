@@ -101,10 +101,14 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
   });
   try {
     await screen.goto("/screen");
-    await expect(screen.getByText("Business as unusual.")).toBeVisible();
+    await expect(
+      screen.getByRole("heading", { name: "LEADERS vs WORKERS" }),
+    ).toBeVisible();
     await host.goto("/host");
     const expectHost = async () => {
-      await expect(host.getByText("Run the show.")).toBeVisible();
+      await expect(
+        host.getByRole("heading", { name: "Host", exact: true }),
+      ).toBeVisible();
       await expect(host.locator('input[type="password"]')).toHaveCount(0);
     };
     await expectHost();
@@ -126,7 +130,7 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
     );
     await expect.poll(() => control.state?.phase).toBe("PLAYING");
     await host.locator("#camera-mode").click();
-    await expect(host.locator("#camera-mode")).toHaveText("▣ Full field");
+    await expect(host.locator("#camera-mode")).toHaveText("Full field");
     await host.locator("#camera-mode").click();
     await host.locator("#broadcast-mode").click();
     await expect(host.locator("body")).toHaveClass(/broadcast-view/);
@@ -134,7 +138,10 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
     const previousSocket = hostSocket;
     await hostSocket!.close({ code: 1012, reason: "Test reconnect" });
     await expect.poll(() => hostSocket !== previousSocket).toBe(true);
-    await expect(host.locator(".connection")).toContainText("LIVE CONNECTION");
+    await expect(host.locator(".host-header")).toHaveAttribute(
+      "data-connected",
+      "true",
+    );
     await expect(host.locator("body")).toHaveClass(/broadcast-view/);
 
     await host.keyboard.press("Escape");
@@ -189,8 +196,8 @@ test("desktop player: fullscreen, keyboard movement and refresh restore the same
   try {
     await page.goto("/join");
     await page.locator("#name").fill("Alex");
-    await page.getByRole("button", { name: /JOIN GAME/ }).click();
-    await expect(page.getByText("YOU ARE IN")).toBeVisible();
+    await page.getByRole("button", { name: /^Play$/ }).click();
+    await expect(page.getByText("You’re in")).toBeVisible();
     host.command("start");
     await expect.poll(() => host.state?.phase).toBe("PLAYING");
     await expect(page.locator("#arena")).toHaveAttribute(
@@ -236,7 +243,7 @@ test("desktop player: fullscreen, keyboard movement and refresh restore the same
     await expect
       .poll(() => page.evaluate(() => !!document.fullscreenElement))
       .toBe(false);
-    await expect(page.locator("header")).toBeVisible();
+    await expect(page.locator("header")).toHaveCount(0);
     await page.getByRole("button", { name: "Enter full screen" }).click();
     await expect
       .poll(() => page.evaluate(() => !!document.fullscreenElement))
@@ -294,47 +301,13 @@ test("mobile: short iPhone viewport, readable ball, player camera, honest fullsc
   });
   try {
     await page.goto("/join");
-    await expect(page.locator("#fullscreen-guide")).toBeVisible();
-    await expect(page.locator("#fullscreen-guide")).toHaveAttribute(
-      "aria-label",
-      "Add to Home Screen: show setup guide",
-    );
-    await page.screenshot({
-      path: "artifacts/install-guide/iphone-join.png",
-      fullPage: true,
-    });
+    // The join form contains only name/team/play; fullscreen help remains
+    // available from Screen options during gameplay.
+    await expect(page.locator("#fullscreen-guide")).toHaveCount(0);
     await page.locator("#name").fill("Mobile");
-    await page.locator("#fullscreen-guide").click();
-    const setupGuide = page.getByRole("dialog", { name: "Add Office Arena." });
-    await expect(setupGuide).toContainText("Add to Home Screen");
-    await expect(setupGuide).toContainText("Open as Web App");
-    await expect(setupGuide).toContainText("before the host starts");
-    for (const description of await setupGuide
-      .locator(".install-steps p")
-      .all())
-      expect(
-        await description.evaluate((el) =>
-          parseFloat(getComputedStyle(el).fontSize),
-        ),
-      ).toBeGreaterThanOrEqual(14);
-    await page.screenshot({ path: "artifacts/install-guide/iphone-390.png" });
-    await page.setViewportSize({ width: 320, height: 568 });
-    expect(
-      await setupGuide.evaluate((el) => el.scrollWidth - el.clientWidth),
-    ).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: "artifacts/install-guide/iphone-320.png" });
-    // Setup only provides guidance; it never joins a player or claims installation.
-    expect(host.state!.players).toHaveLength(1);
-    expect(host.state!.phase).toBe("WAITING");
-    await page
-      .getByRole("button", { name: "PLAY IN BROWSER", exact: true })
-      .click();
-    await expect(setupGuide).toBeHidden();
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.locator("#name")).toHaveValue("Mobile");
     await page.locator('[data-team="WORKERS"]').click();
-    await page.getByRole("button", { name: /JOIN GAME/ }).click();
-    await expect(page.getByText("YOU ARE IN")).toBeVisible();
+    await page.getByRole("button", { name: /^Play$/ }).click();
+    await expect(page.getByText("You’re in")).toBeVisible();
     host.command("start");
     await expect(page.getByText("Rotate your phone to play")).toBeVisible();
     await page.setViewportSize({ width: 568, height: 240 });
@@ -518,8 +491,8 @@ test("overhead action camera: follows a distant ball on phones, spectator and ho
   try {
     await page.goto("/join");
     await page.locator("#name").fill("TEST Maya");
-    await page.getByRole("button", { name: /JOIN GAME/ }).tap();
-    await expect(page.getByText("YOU ARE IN")).toBeVisible();
+    await page.getByRole("button", { name: /^Play$/ }).tap();
+    await expect(page.getByText("You’re in")).toBeVisible();
     const local = host.state!.players.find((p) => p.name === "TEST Maya")!;
     host.ws.send(
       JSON.stringify({

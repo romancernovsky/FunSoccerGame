@@ -176,16 +176,31 @@ test("three real teammate passes qualify for Team Goal", () => {
   Object.assign(q, { x: 500, y: 350, fx: -1, fy: 0 });
   g.possessionTeam = "LEADERS";
   g.ball.owner = p.id;
+  let time = now + 4100;
   for (let i = 0; i < 3; i++) {
     const passer = i % 2 === 0 ? p : q,
       receiver = i % 2 === 0 ? q : p;
+    Object.assign(p, { x: 300, y: 350, fx: 1, fy: 0 });
+    Object.assign(q, { x: 500, y: 350, fx: -1, fy: 0 });
+    g.input(passer.id, { x: 0, y: 0, action: false, dash: false }, time);
     g.ball.owner = passer.id;
     g.ball.x = passer.x + passer.fx * 29;
     g.ball.y = 350;
-    g.release(0.1, now + 4100 + i * 1000);
-    g.ball.x = receiver.x;
-    g.ball.y = receiver.y;
-    g.tick(0.01, now + 4400 + i * 1000);
+    g.release(0.1, time);
+    // The receiver runs onto the real pass, controls its rebound and keeps the
+    // sequence alive. Do not teleport a fast ball into automatic possession.
+    for (let tick = 0; tick < 120 && g.ball.owner !== receiver.id; tick++) {
+      time += 1000 / 30;
+      const dx = g.ball.x - receiver.x,
+        dy = g.ball.y - receiver.y,
+        distance = Math.max(30, Math.hypot(dx, dy));
+      g.input(
+        receiver.id,
+        { x: dx / distance, y: dy / distance, action: false, dash: false },
+        time,
+      );
+      g.tick(1 / 30, time);
+    }
     assert.equal(g.ball.owner, receiver.id);
   }
   assert.equal(g.passes, 3);

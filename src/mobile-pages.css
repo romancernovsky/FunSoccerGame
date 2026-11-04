@@ -1,711 +1,377 @@
-/* Non-host pages are readable at phone sizes; gameplay has its own HUD rules. */
-.phone-join,
-.roster-empty-message {
-  display: none;
+/* Minimal public screens. Player gameplay keeps its dedicated HUD stylesheet. */
+.public-page {
+  min-height: 100svh;
+  background: #101f26;
 }
-.public-page .joined-top {
+.public-page .public-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 72px;
+  gap: 8px 16px;
+  padding: max(12px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) 12px
+    max(16px, env(safe-area-inset-left));
+  max-width: 1040px;
+  margin: auto;
+  border: 0;
 }
-.public-page .joined-top .check-mark {
-  float: none;
-  margin: 0;
-  flex: none;
-}
-.public-page .check-mark svg {
-  width: 26px;
-  height: 26px;
-}
-.public-page .joined-card h1 small {
-  display: block;
-  font:
-    700 16px "DM Sans",
-    sans-serif;
-  letter-spacing: 1px;
-  margin-bottom: 5px;
-}
-.public-page .joined-card h1 > span {
-  display: block;
-}
-.public-page .lobby-note {
-  margin-top: 14px;
-}
-.public-page .how-to {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-.public-page .how-to .lobby-control {
+.public-page .public-header .brand {
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 10px;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
 }
-.public-page .lobby-control > svg {
-  width: 24px;
-  height: 24px;
-  color: #dafa95;
-  flex: none;
+.public-header .brand > span,
+.host-header .brand > span {
+  color: #92a7b2;
+  font-size: 12px;
+  font-weight: 400;
 }
-.public-page .lobby-control > span {
-  min-width: 0;
+.public-page .public-header nav {
+  display: flex;
+  align-self: auto;
+  gap: 4px;
 }
-.public-page .lobby-control strong {
-  display: block;
+.public-page .public-header nav a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  min-height: 44px;
+  padding: 10px 12px;
   font-size: 16px;
+  border-radius: 8px;
 }
-.public-page .lobby-control small {
-  display: block;
-  margin-top: 4px;
+.public-page .public-header nav a.current {
+  color: #dafa95;
+  background: #dafa9510;
+}
+.public-offline {
+  width: 100%;
+  color: #ffcd93;
   font-size: 14px;
 }
-
-.public-page .lobby-control .keyboard-hint {
+.public-page .public-content {
+  max-width: 1040px;
+  width: 100%;
+  padding: 20px max(16px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  margin: 0 auto;
+  font-size: 16px;
+}
+.public-page .simple-panel {
+  display: block;
+  width: 100%;
+  max-width: 440px;
+  margin: 16px auto;
+  padding: 0;
+}
+.public-page .simple-panel h1 {
+  font:
+    700 30px/1.2 "DM Sans",
+    sans-serif;
+  letter-spacing: -1px;
+  margin: 0 0 24px;
+}
+.public-page .public-content.audience-main {
+  width: calc(100% - 32px);
+  max-width: 440px;
+  padding: 0;
+  margin: 36px auto;
+}
+.public-page .simple-panel p,
+.public-page .simple-panel small {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #aabfc9;
+}
+.public-page .simple-panel label,
+.public-page .simple-panel legend {
+  display: block;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #ecf2f3;
+  margin: 0 0 10px;
+}
+.public-page .simple-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 24px 0;
+  min-width: 0;
+}
+.public-page .simple-panel #name {
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid #bdd7e633;
+  border-radius: 10px;
+  background: #102832;
+  color: #f2f6f5;
+  font-size: 18px;
+}
+.public-page .simple-panel .team-options,
+.public-page .simple-panel .prediction-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.public-page .simple-panel .team-option,
+.public-page .simple-panel .prediction-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  min-height: 112px;
+  padding: 18px 8px;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid #72b2f050;
+  background: #143345;
+  color: #9ad3ff;
+  border-radius: 12px;
+  box-shadow: none;
+  touch-action: manipulation;
+}
+.public-page .simple-panel .team-option.workers,
+.public-page .simple-panel .prediction-option.workers {
+  background: #342c29;
+  border-color: #f7aa7050;
+  color: #ffc294;
+}
+.public-page .simple-panel .team-option strong,
+.public-page .simple-panel .prediction-option strong {
+  font:
+    700 clamp(23px, 6vw, 28px)/1.1 "Barlow Condensed",
+    sans-serif;
+  letter-spacing: 0.5px;
+}
+.public-page .simple-panel .team-option small,
+.public-page .simple-panel .prediction-option small {
+  font-size: 14px;
+  color: inherit;
+  letter-spacing: 0;
+}
+.public-page .simple-panel .team-option.selected,
+.public-page .simple-panel .prediction-option.is-picked {
+  outline: 2px solid #dafa95;
+  outline-offset: 2px;
+  border-color: transparent;
+}
+.public-page .simple-panel button:disabled {
+  opacity: 0.4;
+}
+.public-page .simple-panel .prediction-option.is-picked:disabled {
+  opacity: 1;
+}
+.public-page .simple-panel .primary,
+.public-page .simple-panel > .secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 54px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 10px;
+  margin-top: 12px;
+}
+.public-page .simple-panel #error:empty,
+.public-page .prediction-error:empty {
   display: none;
 }
-@media (pointer: fine) {
-  .public-page .lobby-control .keyboard-hint {
-    display: inline;
-  }
-  .public-page .lobby-control .touch-hint {
-    display: none;
-  }
+.public-page .simple-panel #error,
+.public-page .prediction-error {
+  min-height: 0;
+  color: #ffb9a3;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 12px 0;
 }
-
-@media (max-width: 900px) {
-  .public-page .public-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    height: auto;
-    min-height: 72px;
-    gap: 12px 8px;
-    padding: max(16px, env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right)) 12px
-      max(16px, env(safe-area-inset-left));
+.public-page .join-full a {
+  color: #dafa95;
+  text-decoration: underline;
+}
+.public-page .joined-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.public-page .joined-identity > strong {
+  font-size: 24px;
+  overflow-wrap: anywhere;
+  color: #f2f6f5;
+}
+.public-page .joined-identity > .leaders {
+  color: #9ad3ff;
+}
+.public-page .joined-identity > .workers {
+  color: #ffc294;
+}
+.public-page .waiting-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 12px 16px;
+  font-size: 16px;
+  margin: 0 0 28px;
+}
+.public-page .waiting-team {
+  padding-top: 20px;
+  border-top: 1px solid #c4e2ee20;
+}
+.public-page .waiting-team h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font:
+    600 16px/1.5 "DM Sans",
+    sans-serif;
+}
+.public-page .waiting-team h2 span {
+  color: #aabfc9;
+  font-weight: 400;
+}
+.public-page .waiting-team ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.public-page .waiting-team li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.public-page .audience-main > .bet-note {
+  margin: -12px 0 24px;
+}
+.public-page #your-prediction {
+  color: #dafa95;
+  font-size: 16px;
+  margin: 0 0 16px;
+}
+.public-page .crowd-card {
+  padding: 18px 0;
+  border: 0;
+  border-top: 1px solid #c4e2ee20;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  margin: 20px 0 0;
+}
+.crowd-heading > strong,
+.crowd-lock,
+.crowd-labels > span {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.public-page .crowd-labels {
+  margin: 16px 0 10px;
+}
+.public-page .crowd-labels b {
+  font-size: 18px;
+  margin-left: 4px;
+}
+.public-page .crowd-track {
+  height: 6px;
+}
+.public-page .audience-match {
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid #c4e2ee20;
+  border-bottom: 1px solid #c4e2ee20;
+  background: none;
+  margin: 24px 0;
+}
+.public-page .audience-status,
+.public-page .audience-clock,
+.public-page .audience-connection {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.public-page .audience-score > span {
+  font-size: 24px;
+}
+.public-page .audience-score strong {
+  font-size: 36px;
+  gap: 10px;
+}
+.public-page .audience-connection {
+  color: #ffcd93;
+}
+.roster-empty-message {
+  color: #aabfc9;
+  font-size: 16px;
+  padding: 16px 0;
+}
+.public-page .player-label {
+  font-size: 18px;
+}
+.public-page .player-label small {
+  font-size: 14px;
+}
+.public-page .roster-row {
+  min-height: 60px;
+  height: auto;
+  padding: 10px 0;
+}
+.public-page .phone-join {
+  display: none;
+}
+@media (max-width: 760px) {
+  .public-page .public-content > .section-top h1 {
+    font-size: 32px;
   }
-  .public-page .public-header .brand {
-    grid-column: 1;
-    grid-row: 1;
-    font-size: 16px;
-    gap: 8px;
-    letter-spacing: -0.4px;
+  .public-page .lobby-layout {
+    grid-template-columns: 1fr;
   }
-  .public-page .public-header .brand-icon {
-    width: 30px;
-    height: 30px;
-    font-size: 26px;
-    flex: none;
-  }
-  .public-page .public-header .brand small {
-    font-size: 10px;
-    letter-spacing: 0.7px;
-    line-height: 1.4;
-    margin-top: 3px;
-  }
-  .public-page .public-header .connection {
-    display: flex;
-    max-width: 110px;
-    grid-column: 2;
-    grid-row: 1;
-    font-size: 14px;
-    letter-spacing: 0;
-    gap: 6px;
-    color: #bcd0d8;
-  }
-  .public-page .public-header nav {
-    grid-column: 1/-1;
-    grid-row: 2;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-    width: 100%;
-    align-self: auto;
-  }
-  .public-page .public-header nav a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 9px 8px;
-    font-size: 16px;
-    line-height: 1.4;
-  }
-  .public-page:has(.waiting-layout) .public-header nav {
-    display: none;
-  }
-  .public-page .public-content {
-    width: 100%;
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 22px max(16px, env(safe-area-inset-right)) 28px
-      max(16px, env(safe-area-inset-left));
-    font-size: 16px;
-    line-height: 1.5;
-  }
-  .public-page .public-content p {
-    font-size: 16px;
-    line-height: 1.6;
-    color: #bcd0d8;
-  }
-  .public-page .public-content small {
-    font-size: 14px;
-    line-height: 1.5;
-    color: #b0c8d2;
-  }
-  .public-page .public-content .eyebrow {
-    font-size: 12px;
-    line-height: 1.5;
-    letter-spacing: 1px;
-    color: #bdcfd5;
-  }
-  .public-page .public-content h1 {
-    font-size: clamp(36px, 8.5vw, 48px);
-    line-height: 1.05;
-  }
-  .public-page .public-content h2 {
-    line-height: 1.15;
-  }
-  .public-page .public-content .primary,
-  .public-page .public-content .secondary,
-  .public-page .public-content .danger {
-    min-height: 48px;
-    padding: 12px 16px;
-    font-size: 16px;
-    line-height: 1.4;
-    letter-spacing: 0.3px;
-    text-align: center;
-  }
-  .public-page .public-content a.primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .public-page .public-content label {
-    font-size: 14px;
-    line-height: 1.5;
-    margin: 20px 0 10px;
-  }
-  .public-page .public-content label small {
-    float: none;
-    display: block;
-    margin-top: 4px;
-  }
-  .public-page .public-content input:not([type="range"]) {
-    width: 100%;
-    min-height: 52px;
-    padding: 13px 14px;
-    font-size: 18px;
-  }
-  .public-page .public-content #name {
-    background: #0b202c;
-    border-color: #647d8b;
-  }
-  .public-page .public-content #name::placeholder {
-    color: #9db5c0;
-    opacity: 1;
-  }
-  .public-page .public-content #error,
-  .public-page .public-content .prediction-error {
-    font-size: 15px;
-    line-height: 1.5;
-  }
-  .public-page .public-content .join-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 0;
-  }
-  .public-page .public-content .join-intro {
-    padding: 0;
-  }
-  .public-page .public-content .join-intro .eyebrow {
-    display: none;
-  }
-  .public-page .public-content .join-intro h1 {
-    font-size: 42px;
-    margin: 0;
-  }
-  .public-page .public-content .join-intro h1 br {
-    display: none;
-  }
-  .public-page .public-content .join-intro > p,
-  .public-page .public-content .intro-bottom {
-    display: none;
-  }
-  .public-page .public-content .join-form-card {
-    width: 100%;
-    margin: 0;
+  .public-page .join-card {
     padding: 20px;
   }
-  .public-page .public-content .join-form-card > .eyebrow {
+  .public-page .join-card h2,
+  .public-page .join-card .qr-wrap,
+  .public-page .join-card .join-link {
     display: none;
   }
-  .public-page .public-content .join-form-card h2 {
-    font-size: 32px;
-    margin: 0;
-  }
-  .public-page .public-content .team-options {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-  .public-page .public-content .team-option {
-    padding: 16px 12px;
-    min-height: 112px;
-    min-width: 0;
-  }
-  .public-page .public-content .team-option > span {
-    font-size: 26px;
-    margin: 0 0 5px;
-  }
-  .public-page .public-content .team-option strong {
-    font-size: 16px;
-    letter-spacing: 0;
-  }
-  .public-page .public-content .team-option small {
-    font-size: 14px;
-  }
-  .public-page .public-content .form-note {
-    font-size: 14px;
-    margin-top: 14px;
-  }
-  .public-page .public-content:has(.join-layout) {
+  .public-page .phone-join {
     display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-  .public-page .public-content:has(.join-layout) .join-layout {
-    order: 1;
-  }
-  .public-page .public-content:has(.join-layout) .audience-entry {
-    order: 2;
-  }
-  .public-page
-    .public-content:has(.join-layout):not(:has(.team-option:enabled))
-    .audience-entry {
-    order: 0;
-  }
-  .public-page .public-content .audience-entry {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 18px;
-    margin: 0 0 20px;
-    gap: 14px;
-  }
-  .public-page .public-content .audience-entry .eyebrow {
-    font-size: 11px;
-  }
-  .public-page .public-content .audience-entry h2 {
-    font-size: 27px;
-    margin: 6px 0;
-  }
-  .public-page .public-content .audience-entry p {
-    font-size: 15px;
-  }
-  .public-page .public-content .ios-launch-tip {
-    padding: 16px;
-  }
-  .public-page .public-content .ios-launch-tip p {
-    font-size: 15px;
-  }
-  .public-page .public-content .waiting-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    padding: 0;
-    align-items: stretch;
-  }
-  .public-page .public-content .joined-card {
-    min-width: 0;
-  }
-  .public-page .public-content .joined-card h1 {
-    margin: 10px 0 14px;
-    font-size: clamp(40px, 11vw, 52px);
-  }
-  .public-page .public-content .joined-card h1 small {
-    font-size: 14px;
-  }
-  .public-page .public-content .joined-card .check-mark {
-    width: 40px;
-    height: 40px;
-  }
-  .public-page .public-content .joined-card > p {
-    font-size: 16px;
-  }
-  .public-page .public-content .waiting-pill {
-    margin-top: 16px;
-    padding: 12px 16px;
-    font-size: 16px;
-    gap: 10px;
-  }
-  .public-page .public-content .how-to {
-    margin: 20px 0 0;
-    gap: 12px;
-  }
-  .public-page .public-content .how-to .lobby-control {
-    padding: 14px 10px;
-    border: 1px solid #bed8e426;
-    background: #122d3c88;
-    border-radius: 9px;
-    gap: 8px;
-  }
-  .public-page .public-content .lobby-control strong {
-    font-size: 16px;
-    line-height: 1.3;
-  }
-  .public-page .public-content .lobby-control small {
-    font-size: 14px;
-    line-height: 1.45;
-    margin-top: 4px;
-  }
-  .public-page .public-content .waiting-layout .team-card {
-    max-width: none;
-    width: 100%;
-  }
-  .public-page .public-content .teams-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 18px;
-    margin: 20px 0 0;
-  }
-  .public-page .public-content .team-title {
-    padding: 16px;
-    gap: 12px;
-  }
-  .public-page .public-content .team-title .eyebrow {
-    display: none;
-  }
-  .public-page .public-content .team-title h2 {
-    font-size: 30px;
-    margin: 0;
-    letter-spacing: 0.5px;
-  }
-  .public-page .public-content .team-emblem {
-    width: 34px;
-    height: 38px;
-    font-size: 30px;
-    flex: none;
-  }
-  .public-page .public-content .capacity {
-    font-size: 28px;
-    line-height: 1;
-    white-space: nowrap;
-  }
-  .public-page .public-content .capacity small {
-    font-size: 16px;
-  }
-  .public-page .public-content .roster {
-    padding: 0 16px;
-  }
-  .public-page .public-content .roster-row {
-    min-height: 64px;
-    height: auto;
-    padding: 12px 0;
-    font-size: 16px;
-    gap: 12px;
-  }
-  .public-page .public-content .player-label {
-    min-width: 0;
-    overflow-wrap: anywhere;
-    font-size: 16px;
-    line-height: 1.4;
-  }
-  .public-page .public-content .player-label small {
-    font-size: 14px;
-    margin-top: 4px;
-    color: #b3cbd5;
-  }
-  .public-page .public-content .avatar {
-    width: 34px;
-    height: 34px;
-    font-size: 14px;
-    flex: none;
-  }
-  .public-page .public-content .player-dot {
-    width: 7px;
-    height: 7px;
-    flex: none;
-  }
-  .public-page .public-content .roster-row.empty {
-    display: none;
-  }
-  .public-page .public-content .roster-empty-message {
-    display: block;
-    padding: 18px 0;
-    font-size: 16px;
-    color: #b4cbd6;
-    line-height: 1.5;
-  }
-  .public-page .public-content .team-footer {
-    padding: 12px 16px;
-    gap: 12px;
-    font-size: 14px;
-    letter-spacing: 0;
-    color: #c3d8de;
-    flex-wrap: wrap;
-  }
-  .public-page .public-content .team-footer span {
-    font-size: 14px;
-    color: #b1c9d4;
-  }
-  .public-page .public-content .section-top {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 18px;
-    margin-bottom: 20px;
-  }
-  .public-page .public-content .section-top h1 {
-    font-size: 42px;
-  }
-  .public-page .public-content .section-top p {
-    margin-top: 10px;
-    font-size: 16px;
-  }
-  .public-page .public-content .lobby-status {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 12px;
-    text-align: left;
-    padding: 12px 0 0;
-  }
-  .public-page .public-content .status-pill {
-    font-size: 12px;
-    padding: 7px 10px;
-    letter-spacing: 0.4px;
-  }
-  .public-page .public-content .lobby-status strong {
-    font-size: 22px;
-  }
-  .public-page .public-content .lobby-status strong span {
-    display: inline;
-    font-size: 14px;
-  }
-  .public-page .public-content .lobby-status > small {
-    flex-basis: 100%;
-    font-size: 15px;
-  }
-  .public-page .public-content .lobby-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-  .public-page .public-content .join-card {
-    order: -1;
-    width: 100%;
-    background: #152d3a;
-    color: #edece3;
-    border: 1px solid #bed8e426;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 16px;
-    margin: 0;
-    text-align: center;
-  }
-  .public-page .public-content .join-card::before {
-    display: none;
-  }
-  .public-page .public-content .join-card h2,
-  .public-page .public-content .join-card > p,
-  .public-page .public-content .join-card > strong,
-  .public-page .public-content .join-card .qr-wrap,
-  .public-page .public-content .join-card .quick-facts {
-    display: none;
-  }
-  .public-page .public-content .join-card > .eyebrow {
-    display: none;
-  }
-  .public-page .public-content .join-card p {
-    font-size: 16px;
-  }
-  .public-page .public-content .phone-join {
-    display: inline-flex;
-    width: 100%;
-    margin: 12px 0 4px;
-  }
-  .public-page .public-content .join-link {
-    font-size: 15px;
-    color: #bcd0d8;
-    overflow-wrap: anywhere;
-    max-width: 100%;
-  }
-  .public-page .public-content .rules-strip {
-    display: none;
-  }
-  .public-page .public-content > .scoreboard,
-  .public-page .public-content .lobby-main > .scoreboard {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    gap: 8px;
-    min-height: 96px;
-    padding: 12px;
-  }
-  .public-page .public-content .scoreboard .score-team {
-    font-size: 22px;
     justify-content: center;
-    gap: 0;
-  }
-  .public-page .public-content .scoreboard .score-team > span {
-    display: none;
-  }
-  .public-page .public-content .scoreboard .score {
-    font-size: 36px;
-    gap: 8px;
-    padding: 3px 8px;
-    min-width: 0;
-  }
-  .public-page .public-content .scoreboard .clock-wrap {
-    grid-column: 1/-1;
-    justify-self: center;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    border: 0;
-    padding: 0;
-    margin: 0;
-  }
-  .public-page .public-content .scoreboard .clock-wrap small {
-    display: block;
-    font-size: 12px;
-    letter-spacing: 0.5px;
-  }
-  .public-page .public-content .scoreboard .clock-wrap strong {
-    font-size: 23px;
-  }
-  .public-page .public-content .match-heading {
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-  }
-  .public-page .public-content .match-heading .eyebrow {
-    font-size: 12px;
-  }
-  .public-page .public-content .match-bottom {
-    gap: 12px;
-    flex-wrap: wrap;
-    font-size: 13px;
-    line-height: 1.5;
-    margin-top: 14px;
-  }
-  .public-page .public-content .arena-overlay > p {
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  .public-page .public-content .pitch-lobby-badge {
-    font-size: 11px;
-    padding: 6px 10px;
-    letter-spacing: 0.5px;
-  }
-  .public-page .public-content .pitch-vs {
-    font-size: 26px;
-  }
-  .public-page .public-content .pitch-subtitle,
-  .public-page .public-content .pitch-label,
-  .public-page .public-content .pitch-watermark {
-    display: none;
-  }
-  .public-page .public-content .crowd-card {
-    padding: 18px;
-    margin: 20px 0;
-  }
-  .public-page .public-content .crowd-heading {
-    gap: 8px;
-  }
-  .public-page .public-content .crowd-heading > strong {
-    font-size: 16px;
-  }
-  .public-page .public-content .crowd-lock {
-    font-size: 12px;
-    line-height: 1.5;
-    letter-spacing: 0.3px;
-  }
-  .public-page .public-content .crowd-labels > span {
-    font-size: 14px;
-  }
-  .public-page .public-content .crowd-labels b {
-    font-size: 20px;
-  }
-  .public-page .public-content .crowd-labels small {
-    font-size: 14px;
-  }
-  .public-page .public-content .crowd-result {
-    font-size: 16px;
-  }
-  .public-page .public-content .audience-intro {
-    font-size: 16px;
-  }
-  .public-page .public-content.audience-main > h1 {
-    font-size: clamp(38px, 9.5vw, 52px);
-    margin: 12px 0 18px;
-  }
-  .public-page .public-content .audience-status {
-    font-size: 13px;
-    line-height: 1.5;
-    letter-spacing: 0.5px;
-  }
-  .public-page .public-content .audience-score > span {
-    font-size: 24px;
-  }
-  .public-page .public-content .audience-clock {
-    font-size: 18px;
-  }
-  .public-page .public-content .prediction-pick > .eyebrow {
-    font-size: 14px;
-    letter-spacing: 0.5px;
-  }
-  .public-page .public-content .prediction-option {
-    min-height: 152px;
-    padding: 18px 10px;
-  }
-  .public-page .public-content .prediction-option strong {
-    font-size: 30px;
-  }
-  .public-page .public-content .prediction-option small {
-    font-size: 14px;
-    letter-spacing: 0.3px;
-  }
-  .public-page .public-content .prediction-note,
-  .public-page .public-content .prediction-fineprint {
-    font-size: 14px;
-  }
-  .public-page .public-content .audience-connection {
-    font-size: 13px;
-    letter-spacing: 0.5px;
-  }
-  .public-page .public-content .pin-panel {
-    width: 100%;
-    margin: 12px 0;
-    padding: 0;
-  }
-  .public-page .public-content .pin-panel h1 {
-    font-size: 40px;
-  }
-  .public-page .public-content .pin-panel p {
-    font-size: 16px;
-  }
-  .public-page .public-content .pin-panel > a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    margin-top: 12px;
     min-height: 48px;
     font-size: 16px;
-    white-space: normal;
   }
-  .public-page .public-content .pin-panel > a:not(.primary) {
-    color: #bcd0d8;
+  .public-page .scoreboard {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .public-page .public-content .score-team {
+    font-size: 22px;
+  }
+  .public-page .public-content .score-team > span {
+    display: none;
+  }
+  .public-page .public-content .clock-wrap {
+    padding-left: 12px;
+  }
+  .public-page .match-heading {
+    flex-wrap: wrap;
+    gap: 12px;
   }
   .public-page .public-content .arena-wrap:has(.arena-overlay.finished) {
     min-height: 240px;
   }
   .public-page .public-content .arena-overlay.finished {
-    background: #061724e8;
     padding: 16px;
     gap: 8px;
   }
@@ -719,20 +385,96 @@
   .public-page .public-content .arena-overlay.finished > h2 {
     font-size: 28px;
   }
-  .public-page > #app > footer {
-    padding: 20px max(16px, env(safe-area-inset-right))
-      max(24px, env(safe-area-inset-bottom))
-      max(16px, env(safe-area-inset-left));
-    font-size: 12px;
-    gap: 16px;
+}
+@media (max-width: 360px) {
+  .public-page .public-header {
+    justify-content: center;
   }
-  .public-page > #app > footer button {
-    min-height: 44px;
+  .public-page .public-header .brand {
+    width: 100%;
+    justify-content: center;
+  }
+  .public-page .simple-panel {
+    margin-top: 8px;
+  }
+}
+/* Administration has no links into the public flow. */
+.host-header {
+  min-height: 64px;
+  height: auto;
+  padding: 16px 4%;
+}
+.host-header .brand {
+  font-size: 16px;
+  gap: 6px;
+}
+.host-header .brand small {
+  margin: 0 0 0 12px;
+  letter-spacing: 1px;
+  font-size: 12px;
+}
+.host-console .host-console-heading {
+  margin-bottom: 20px;
+}
+.host-console .host-console-heading h1 {
+  font:
+    600 28px/1.2 "DM Sans",
+    sans-serif;
+}
+.host-console .host-actions {
+  flex-wrap: wrap;
+}
+.host-console .host-actions button {
+  min-height: 44px;
+  font-size: 14px;
+}
+.host-console > .crowd-card {
+  padding: 16px 20px;
+}
+.host-console .host-warning {
+  min-height: 18px;
+}
+.host-console .host-warning:empty {
+  display: none;
+}
+.audio-panel {
+  margin-top: 8px;
+  padding: 10px 16px;
+  gap: 8px;
+}
+.audio-panel #audio-status {
+  font-size: 13px;
+  color: #bcd0d8;
+}
+.audio-panel #audio-status:empty {
+  display: none;
+}
+.watch-toolbar {
+  flex-wrap: wrap;
+}
+.watch-toolbar .watch-audio {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  flex: 1;
+  max-width: none;
+}
+.broadcast-view .watch-audio {
+  display: flex;
+}
+.watch-audio #audio-status {
+  display: none;
+}
+.watch-audio[data-status="blocked"] #audio-status {
+  display: block;
+}
+@media (max-width: 900px) {
+  .watch-toolbar .audio-actions {
+    gap: 6px;
+  }
+  .watch-toolbar .audio-actions button {
     font-size: 14px;
-    padding: 8px 12px;
-  }
-  .public-page > #app > footer input[type="range"] {
-    height: 44px;
-    width: 120px;
   }
 }

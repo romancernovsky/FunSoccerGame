@@ -42,25 +42,22 @@ export class Predictions {
   ) {
     if (roundId !== this.roundId)
       throw new PredictionError(
-        "A new prediction round has opened. Choose again.",
+        "A new betting round has opened. Choose again.",
         409,
       );
     if (this.locked || phase !== "WAITING")
-      throw new PredictionError(
-        "Predictions are locked. Enjoy the match!",
-        409,
-      );
+      throw new PredictionError("Bets are locked.", 409);
     if (typeof team !== "string" || !TEAMS.includes(team as Team))
       throw new PredictionError("Choose LEADERS or WORKERS.");
     const previous = this.picks.get(token);
     if (previous?.team === team) return;
     if (previous && now - previous.windowAt < 1000 && previous.changes >= 5)
       throw new PredictionError(
-        "You're changing picks too quickly. Try again in a moment.",
+        "You're changing bets too quickly. Try again in a moment.",
         429,
       );
     if (!previous && this.picks.size >= 5000)
-      throw new PredictionError("Audience prediction capacity reached.", 503);
+      throw new PredictionError("Bet capacity reached.", 503);
     if (previous) this.counts[previous.team]--;
     this.counts[team as Team]++;
     this.picks.set(token, {

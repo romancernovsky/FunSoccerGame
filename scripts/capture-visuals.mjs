@@ -19,7 +19,7 @@ try {
     screen = await desktop.newPage(),
     player = await mobile.newPage();
   await host.goto(base + "/host");
-  await host.getByText("Run the show.").waitFor();
+  await host.getByRole("heading", { name: "Host", exact: true }).waitFor();
   await host.waitForTimeout(700);
   if (await host.locator('[data-command="end"]').count()) {
     await host.locator('[data-command="end"]').click();
@@ -36,8 +36,8 @@ try {
   }
   await player.goto(base + "/join");
   await player.locator("#name").fill("Maya");
-  await player.getByRole("button", { name: /JOIN GAME/ }).click();
-  await player.getByText("YOU ARE IN").waitFor();
+  await player.getByRole("button", { name: /^Play$/ }).click();
+  await player.getByText("You’re in").waitFor();
   await host.locator('[data-command="bots"]').click();
   await host.waitForTimeout(300);
   await host.locator('[data-action="keeper"]').nth(1).click();

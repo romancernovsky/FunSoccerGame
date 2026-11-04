@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000` for the spectator lobby, `/join` for players, `/host` for administration and `/screen` for the projector. The root route is a spectator view. Vite is integrated into the Node development service, so one command starts everything. The server listens on all interfaces. Phones on the same network should open `http://YOUR-LAN-IP:3000/join`; open the projector using that same address so its QR code is reachable from phones. Separate browser profiles or private windows simulate different players; tabs in one profile share the temporary player session.
+Open `http://localhost:3000` or `/join` for players, `/bet` for audience bets, and `/host` for match control and streaming. Public navigation contains only **Play** and **Bet**. The optional `/screen` projector route remains directly accessible, without a Watch link in public or host navigation. Vite is integrated into the Node development service, so one command starts everything. The server listens on all interfaces. Phones on the same network should open `http://YOUR-LAN-IP:3000/join`; open the projector using that same address so its QR code is reachable from phones. Separate browser profiles or private windows simulate different players; tabs in one profile share the temporary player session.
 
 The development host console includes **Fill with Test Players**. All bots are labeled TEST PLAYER. This command is rejected by the production server even if called directly.
 
@@ -24,11 +24,12 @@ Players enter a unique 1–12 character name and choose a team. The host can mov
 - Shoot: hold and release Space or PASS / SHOOT. Charge maxes in one second and automatically releases after 1.1 seconds.
 - Dash: Shift or DASH. Short burst with a 2.5-second cooldown.
 - Steal: contact the opponent; dashing increases reach. No health or elimination.
-- Goalkeeper: larger interception range inside their marked area and secure possession for at most two seconds before automatic release.
+- Ball contact: fast passes and shots rebound off teammates and opponents, including during the post-kick pickup lock. Strong shots rebound harder. Run onto a slower ball to control it; a brief rebound lock prevents instant reattachment. Movement is simulated in small travel steps so charged shots cannot skip a player at the normal 20–30 Hz tick rate.
+- Goalkeeper: larger deflection and slow-ball collection range inside their marked area and secure possession for at most two seconds before automatic release.
 
 The three-minute regulation clock pauses for celebrations, kickoff countdowns and host pauses. Three or more completed passes in the same team possession earn TEAM GOAL recognition. Ties enter unlimited Golden Goal. Host pause/resume, confirmed restart/end, rematch and new match are supported. Rematch keeps players and roles; new match clears them.
 
-The public pages (`/join`, the waiting lobby, `/predict` and `/screen`) adapt to narrow phones with 16px body text, 14px control instructions and roster status text, and 44px or larger navigation targets. The waiting lobby uses a compact team heading, two-column control tips and real teammates with an available-spots summary. Empty placeholder rows stay on the desktop host console. Phone spectator lobbies offer a direct join/predict link instead of a QR code; projector screens retain the QR. The host console keeps its existing administration layout.
+The mobile-first player screen contains only a name, team choices with capacity, and **Play**. The waiting screen shows identity, teammates and host status. **Bet** offers two team buttons and a compact tally, then the live score once play begins. Marketing panels, slogans, tutorials before joining and footers have been removed. Navigation and controls retain large touch targets and readable text. Host rosters keep 22px player names and all management controls. During a match, sound controls appear once in the live toolbar.
 
 Players, host and spectator now default to a close overhead camera that follows the ball and nearby action. The steep fixed angle keeps movement directions consistent. Framing adapts to the actual viewport width, so a short landscape phone shows the action rather than most of the pitch. Fast shots get a little more space and responsive camera tracking. **FIELD** shows the full arena; **BALL** restores the action view. A high-contrast ball marker preserves visibility, and an edge **YOU** arrow locates your character when it is outside the frame or underneath a touch control. The attack-direction cue follows your current team.
 
@@ -36,7 +37,7 @@ Native **Full screen** is available only where the browser supports it. Unsuppor
 
 Set up the Home Screen app **before joining**: Safari and standalone storage/session continuity is not guaranteed. If you already joined, stay in that tab for the current match. The guide has an always-visible close control and does not permit movement/shot keyboard input behind it.
 
-On iPhone, the join page's **Add to Home Screen** button opens a short illustrated guide showing the Safari Share icon, the Add action and the actual Office Arena icon to launch. **Play in browser** closes the guide without losing the name you entered. This button cannot create the shortcut or open Apple's Add to Home Screen confirmation automatically: iOS does not support the web `beforeinstallprompt` API. The guide is hidden when launched as a standalone Home Screen app.
+The join form has no installation promotion. The in-game **Screen options** button still explains iPhone Home Screen setup. A web button cannot create the shortcut or open Apple’s Add to Home Screen confirmation automatically: iOS does not support the web `beforeinstallprompt` API.
 
 On `/host`, **Start Match**, **Resume**, **Restart**, **Rematch** and entering **Broadcast mode** unlock browser sound as part of that click. An explicit mute is respected for the rest of that page session. Confirming an incomplete-team start enables sound; simply opening or cancelling the confirmation does not. On `/screen`, click **Enable sound** or **Test sound** once. Either audio button also works on the host page and plays a confirmation tone. **Sound on** means the audio context is running; a blocked/interrupted browser offers **Resume sound**, which stays visible in broadcast mode. Volume changes affect playing audio immediately, and muting stops ongoing sounds.
 
@@ -148,13 +149,13 @@ npm run test:reorg
 
 The dedicated browser check starts an isolated 66-second development match, so the event arrives after six seconds of actual play. It verifies the 1v1 team swap, orange-to-blue 3D kit change, locked clock/controls, pause and player refresh during the reveal, synchronized kickoff, and movement after play resumes. Reorg screenshots are in `artifacts/reorg/`. The capture helper uses only isolated TEST participants and holds genuine REORG snapshots during still capture; it does not inject assignments or scores.
 
-## Audience predictions
+## Audience bets
 
-People who are not playing can open **`/predict`**, or choose **Predict the winner** from `/join`. The projector QR still opens `/join`, which offers both play and prediction paths. Both teams can fill up without starting the match; JOIN GAME is disabled when all twelve slots are taken, while audience predictions remain available. Audience picks never take a player slot or start the match.
+People who are not playing choose **Bet** or open **`/bet`**. The old `/predict` link opens the same Bet view for existing bookmarks. The projector QR opens `/join`, whose navigation offers Play and Bet. **Play** is disabled when all twelve slots are taken; Bet remains available. Bets never take a player slot or start the match.
 
 Each audience browser chooses LEADERS or WORKERS and can change its pick while the lobby is open. The server locks all picks as soon as the host successfully starts the countdown. Failed start attempts leave them open. Late visitors see the crowd split and live score; their next chance to pick is a new prediction lobby. This is a no-money prediction poll with no accounts, odds, stakes, purchases or payouts.
 
-The host and projector show the crowd split. Broadcast mode keeps a compact audience badge on the field. Audience phones show a live score, official clock updates, match status and their saved pick. When a match finishes normally, the winning team determines the prediction result, including Golden Goal; correct predictors see **YOU CALLED IT!**. Host-ended matches produce no prediction winners. The Reorg changes player assignments; predictions remain attached to the team names LEADERS and WORKERS.
+The host shows the bet split; its stream keeps a compact bet badge on the field. Audience phones show a live score, official clock updates, match status and their saved pick. When a match finishes normally, the winning team determines the prediction result, including Golden Goal; correct bettors see **Your bet won!**. Host-ended matches produce no prediction winners. The Reorg changes player assignments; predictions remain attached to the team names LEADERS and WORKERS.
 
 **Rematch lobby** keeps players, team assignments and goalkeeper roles, resets the score, clears previous picks and opens predictions again. The host presses START MATCH when ready. The existing quick **Rematch** and **Restart match** keep the current locked team picks; **New Match** and **Reset lobby** clear all picks along with players. No flow starts a match because teams or predictions fill up.
 

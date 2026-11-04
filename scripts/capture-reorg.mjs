@@ -105,8 +105,8 @@ try {
       if (mode === "mobile") {
         await page.goto(base + "/join");
         await page.locator("#name").fill(names[0]);
-        await page.getByRole("button", { name: /JOIN GAME/ }).click();
-        await page.getByText("YOU ARE IN").waitFor();
+        await page.getByRole("button", { name: /^Play$/ }).click();
+        await page.getByText("You’re in").waitFor();
       }
       for (let i = mode === "mobile" ? 1 : 0; i < 12; i++) {
         const ws = await socket();

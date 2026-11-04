@@ -14,7 +14,7 @@ async function fits(page: Page) {
   );
 }
 
-test("public pages: readable phone layouts, compact lobby and unchanged host scope", async ({
+test("minimal Play/Bet pages fit phones; joining and host streaming stay focused", async ({
   browser,
 }) => {
   const host = new WebSocket("ws://127.0.0.1:3100/ws");
@@ -47,99 +47,99 @@ test("public pages: readable phone layouts, compact lobby and unchanged host sco
     await expect
       .poll(() => state?.phase === "WAITING" && state.players.length === 0)
       .toBe(true);
-
-    // No zooming or horizontal panning is needed on narrow phones or landscape.
     for (const viewport of [
       { width: 320, height: 568 },
       { width: 390, height: 844 },
       { width: 740, height: 320 },
+      { width: 1280, height: 900 },
     ]) {
       await page.setViewportSize(viewport);
-      for (const path of ["/join", "/predict", "/screen"]) {
+      for (const path of ["/", "/join", "/bet"]) {
         await page.goto(path);
-        await expect(page.locator(".public-header nav a")).toHaveCount(3);
-        await page.evaluate(() => document.fonts.ready);
-        for (const link of await page.locator(".public-header nav a").all()) {
+        const nav = page.getByRole("navigation", { name: "Main navigation" });
+        await expect(nav.getByRole("link")).toHaveText(["Play", "Bet"]);
+        for (const link of await nav.getByRole("link").all()) {
           await readable(link, 16);
           expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
         }
-        if (path === "/join") {
+        await expect(
+          page.locator(
+            'a[href="/screen"], a[href="/predict"], a[href="/host"]',
+          ),
+        ).toHaveCount(0);
+        await expect(
+          page.locator(
+            "footer, .join-intro, .audience-entry, .form-note, .ios-launch-tip",
+          ),
+        ).toHaveCount(0);
+        if (path === "/bet") {
+          await expect(
+            page.getByRole("heading", { name: "Bet on the winner" }),
+          ).toBeVisible();
+          await readable(page.locator(".prediction-option small").first(), 14);
+          await expect(
+            page.locator("canvas, #name, .audience-score"),
+          ).toHaveCount(0);
+        } else {
+          await expect(
+            page.getByRole("heading", { name: "Play", exact: true }),
+          ).toBeVisible();
+          await expect(page.locator("form input")).toHaveCount(1);
+          await expect(page.locator("form button")).toHaveCount(3);
           await readable(page.locator("#name"), 18);
           await readable(page.locator(".team-option small").first(), 14);
-          expect(
-            await page
-              .locator(".join-layout")
-              .evaluate((el) => el.getBoundingClientRect().top),
-          ).toBeLessThan(
-            await page
-              .locator(".audience-entry")
-              .evaluate((el) => el.getBoundingClientRect().top),
+          await page.locator('[data-team="WORKERS"]').click();
+          await expect(page.locator('[data-team="WORKERS"]')).toHaveAttribute(
+            "aria-pressed",
+            "true",
           );
-        } else if (path === "/predict") {
-          await readable(page.locator(".audience-intro"), 16);
-          await readable(page.locator(".prediction-option small").first(), 14);
-        } else {
-          await expect(page.locator(".phone-join")).toBeVisible();
-          await expect(page.locator(".roster-row.empty")).toHaveCount(12);
-          await expect(page.locator(".roster-row.empty").first()).toBeHidden();
-          await readable(page.locator(".roster-empty-message").first(), 16);
+          await expect(page.locator('[data-team="LEADERS"]')).toHaveAttribute(
+            "aria-pressed",
+            "false",
+          );
         }
         await fits(page);
-        if (viewport.width === 390)
+        if (viewport.width === 390 || viewport.width === 1280)
           await page.screenshot({
-            path: `artifacts/mobile-pages/${path.slice(1)}-390.png`,
+            path: `artifacts/minimal-pages/${path === "/" ? "home" : path.slice(1)}-${viewport.width}.png`,
             fullPage: true,
           });
       }
     }
+    await page.goto("/predict");
+    await expect(page).toHaveURL(/\/bet$/);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/join");
     await page.locator("#name").fill("Roman");
-    await page.getByRole("button", { name: /JOIN GAME/ }).tap();
-    await expect(page.locator(".waiting-layout")).toBeVisible();
-    await expect(page.locator(".public-header nav")).toBeHidden();
-    for (const width of [320, 390, 430, 740]) {
-      await page.setViewportSize({ width, height: width === 740 ? 320 : 844 });
-      await readable(page.locator(".waiting-pill"), 16);
-      await readable(page.locator(".lobby-note"), 16);
-      await readable(page.locator(".player-label"), 16);
-      await readable(page.locator(".player-label small"), 14);
-      for (const instruction of await page
-        .locator(".lobby-control small")
-        .all())
-        await readable(instruction, 14);
-      await expect(page.locator(".roster-row.empty").first()).toBeHidden();
-      await expect(page.locator(".team-footer")).toContainText(
-        "5 spots available",
-      );
-      await fits(page);
-      if (width === 390 || width === 320)
-        await page.screenshot({
-          path: `artifacts/mobile-pages/waiting-${width}.png`,
-          fullPage: true,
-        });
-    }
-
-    // Public mobile rules never apply to the host's administration page.
+    await page.getByRole("button", { name: "Play", exact: true }).tap();
+    await expect(
+      page.getByRole("heading", { name: "You’re in" }),
+    ).toBeVisible();
+    await readable(page.locator(".waiting-pill"), 16);
+    await expect(page.locator(".joined-identity")).toContainText("Roman");
+    await expect(page.locator(".waiting-team li")).toHaveText(["Roman"]);
+    await expect(
+      page.locator("nav, .how-to, .roster-row.empty, .scoreboard"),
+    ).toHaveCount(0);
+    await fits(page);
+    await page.screenshot({
+      path: "artifacts/minimal-pages/waiting-390.png",
+      fullPage: true,
+    });
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/host");
     await expect(page.locator(".host-actions")).toBeVisible();
     await expect(page.locator("body")).not.toHaveClass(/public-page/);
-    await expect(page.locator("main")).not.toHaveClass(/public-content/);
-    await expect(page.locator(".roster-row.empty").first()).toBeVisible();
-    await expect(page.locator(".team-footer").first()).toContainText(
-      "OPEN FOR BUSINESS",
-    );
-    const hostNameSize = await page
-      .locator(".player-label")
-      .evaluate((el) => getComputedStyle(el).fontSize);
-    expect(hostNameSize).toBe("11px");
+    await expect(
+      page.locator("header nav, footer, a[href='/screen']"),
+    ).toHaveCount(0);
+    await expect(page.locator(".roster-row.empty")).toHaveCount(0);
+    await expect(page.locator(".roster-empty-message")).toBeVisible();
+    await readable(page.locator(".player-label"), 22);
     await page.screenshot({
-      path: "artifacts/mobile-pages/host-desktop.png",
+      path: "artifacts/minimal-pages/host-1280.png",
       fullPage: true,
     });
-    // A phone that didn't join can still read the in-progress page and watch.
-    await page.goto("/predict");
     await page.evaluate(() => localStorage.removeItem("lvw-session"));
     command("bots");
     await expect.poll(() => state?.players.length).toBe(12);
@@ -148,32 +148,15 @@ test("public pages: readable phone layouts, compact lobby and unchanged host sco
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto("/join");
     await expect(
-      page.getByRole("heading", { name: /Match in progress/ }),
+      page.getByRole("heading", { name: "Match in progress" }),
     ).toBeVisible();
-    await readable(page.locator(".pin-panel p"), 16);
-    for (const link of await page.locator(".pin-panel > a").all()) {
-      await readable(link, 16);
-      expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(48);
-    }
+    await expect(page.locator("#join-form, a[href='/screen']")).toHaveCount(0);
+    await expect(
+      page
+        .locator(".join-unavailable")
+        .getByRole("link", { name: "Bet", exact: true }),
+    ).toBeVisible();
     await fits(page);
-    await page.screenshot({
-      path: "artifacts/mobile-pages/in-progress-320.png",
-      fullPage: true,
-    });
-    await page.goto("/screen");
-    await expect(page.locator(".match-heading")).toBeVisible();
-    await readable(page.locator(".score-team").first(), 22);
-    await fits(page);
-    command("end");
-    await expect(page.locator("#arena-overlay")).toContainText(
-      "MATCH ENDED BY HOST",
-    );
-    await readable(page.locator("#arena-overlay .eyebrow"), 14);
-    await fits(page);
-    await page.screenshot({
-      path: "artifacts/mobile-pages/finished-320.png",
-      fullPage: true,
-    });
     expect(errors).toEqual([]);
   } finally {
     if (state && !["WAITING", "FINISHED"].includes(state.phase)) command("end");

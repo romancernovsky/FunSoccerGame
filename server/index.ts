@@ -75,7 +75,7 @@ async function audienceRequest(req: IncomingMessage, res: ServerResponse) {
       req.headers.origin &&
       new URL(req.headers.origin).host !== req.headers.host
     )
-      throw new PredictionError("Open predictions on the game website.", 403);
+      throw new PredictionError("Open bets on the game website.", 403);
     const cookie = req.headers.cookie?.match(
       /(?:^|;\s*)lvw-audience=([a-f0-9]{48})(?:;|$)/,
     )?.[1];
@@ -84,10 +84,10 @@ async function audienceRequest(req: IncomingMessage, res: ServerResponse) {
       if (
         req.headers["content-type"]?.split(";")[0].trim() !== "application/json"
       )
-        throw new PredictionError("Send a JSON prediction.", 415);
+        throw new PredictionError("Send a JSON bet.", 415);
       if (Number(req.headers["content-length"]) > 512) {
         req.resume();
-        throw new PredictionError("Prediction message is too large.", 413);
+        throw new PredictionError("Bet message is too large.", 413);
       }
       let body = "",
         size = 0;
@@ -96,12 +96,12 @@ async function audienceRequest(req: IncomingMessage, res: ServerResponse) {
         if (size <= 512) body += chunk.toString();
       }
       if (size > 512)
-        throw new PredictionError("Prediction message is too large.", 413);
+        throw new PredictionError("Bet message is too large.", 413);
       let data;
       try {
         data = JSON.parse(body);
       } catch {
-        throw new PredictionError("Invalid prediction message.");
+        throw new PredictionError("Invalid bet message.");
       }
       game.predictions.choose(
         token,
@@ -125,7 +125,7 @@ async function audienceRequest(req: IncomingMessage, res: ServerResponse) {
         message:
           error instanceof PredictionError
             ? error.message
-            : "Invalid prediction request.",
+            : "Invalid bet request.",
       }),
     );
   }
@@ -156,9 +156,14 @@ const server = createServer(async (req, res) => {
       res.end();
       return;
     }
-    const target = ["/", "/join", "/host", "/screen", "/predict"].includes(
-      pathname,
-    )
+    const target = [
+      "/",
+      "/join",
+      "/host",
+      "/screen",
+      "/bet",
+      "/predict",
+    ].includes(pathname)
       ? resolve(root, "index.html")
       : file;
     const data = await readFile(target);

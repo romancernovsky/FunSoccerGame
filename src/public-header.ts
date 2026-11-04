@@ -1,13 +1,9 @@
-/** Shared navigation for player, audience and spectator pages; host stays separate. */
-export function publicHeader(
-  active: "play" | "watch" | "predict",
-  online: boolean,
-) {
-  return `<header class="public-header"><a class="brand" href="/screen" aria-label="Office Arena"><span class="brand-icon" aria-hidden="true">✦</span><span>OFFICE<span class="brand-light"> / </span>ARENA<small>LEADERS VS WORKERS</small></span></a><nav aria-label="Main navigation">${(
+/** Two public choices. The host's stream is kept out of player navigation. */
+export function publicHeader(active: "play" | "bet" | null, online: boolean) {
+  return `<header class="public-header"><a class="brand" href="/" aria-label="Leaders vs Workers">LEADERS <span>vs</span> WORKERS</a><nav aria-label="Main navigation">${(
     [
-      ["watch", "/screen", "Watch"],
       ["play", "/join", "Play"],
-      ["predict", "/predict", "Predict"],
+      ["bet", "/bet", "Bet"],
     ] as const
   )
     .map(
@@ -16,5 +12,5 @@ export function publicHeader(
     )
     .join(
       "",
-    )}</nav><div class="connection" role="status"><i class="${online ? "" : "offline"}"></i>${online ? "Connected" : "Reconnecting…"}</div></header>`;
+    )}</nav>${online ? "" : '<span class="public-offline" role="status">Reconnecting…</span>'}</header>`;
 }

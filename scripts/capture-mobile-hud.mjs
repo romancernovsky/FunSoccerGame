@@ -104,8 +104,8 @@ try {
   });
   await page.goto(base + "/join");
   await page.locator("#name").fill("TEST Maya");
-  await page.getByRole("button", { name: /JOIN GAME/ }).click();
-  await page.getByText("YOU ARE IN").waitFor();
+  await page.getByRole("button", { name: /^Play$/ }).click();
+  await page.getByText("You’re in").waitFor();
   if (skills || far) {
     admin.send(
       JSON.stringify({

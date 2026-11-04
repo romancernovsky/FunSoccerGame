@@ -63,8 +63,8 @@ test("01:00 Reorg changes teams and kits, survives refresh/pause, then kicks off
     await page.goto("/join");
     await page.locator("#name").fill("Maya");
     await page.locator('[data-team="WORKERS"]').click();
-    await page.getByRole("button", { name: /JOIN GAME/ }).click();
-    await expect(page.getByText("YOU ARE IN")).toBeVisible();
+    await page.getByRole("button", { name: /^Play$/ }).click();
+    await expect(page.getByText("You’re in")).toBeVisible();
     const id = state!.players.find((p) => p.name === "Maya")!.id;
     command("start");
     await expect(page.locator("#arena")).toHaveAttribute(

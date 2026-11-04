@@ -40,16 +40,10 @@ test("a full lobby welcomes audience picks, locks on host start and reopens for 
     command("bots");
     await expect.poll(() => state?.players.length).toBe(12);
     await page.goto("/join");
-    await expect(
-      page.getByText("TEAMS FULL · YOUR MOMENT ISN’T OVER"),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /JOIN GAME/ }),
-    ).toBeDisabled();
-    await page
-      .getByRole("link", { name: "PREDICT THE WINNER", exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/predict$/);
+    await expect(page.getByText("Teams full.", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Play$/ })).toBeDisabled();
+    await page.getByRole("link", { name: "Bet", exact: true }).click();
+    await expect(page).toHaveURL(/\/bet$/);
     // Only the join view used a game socket; the audience page uses HTTP summaries.
     const socketsBeforePrediction = gameSockets;
     const leaders = page.locator('[data-predict="LEADERS"]');
@@ -57,7 +51,7 @@ test("a full lobby welcomes audience picks, locks on host start and reopens for 
     await leaders.tap();
     await expect(leaders).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#your-prediction")).toHaveText(
-      "YOU'RE BACKING LEADERS",
+      "Your bet: LEADERS",
     );
     await page.reload();
     await expect(leaders).toHaveAttribute("aria-pressed", "true");
@@ -79,7 +73,7 @@ test("a full lobby welcomes audience picks, locks on host start and reopens for 
         data: { team: "LEADERS", roundId },
       });
       await expect(page.locator(".crowd-heading > strong")).toHaveText(
-        "2 audience picks",
+        "2 bets",
       );
     } finally {
       await other.close();
@@ -104,22 +98,18 @@ test("a full lobby welcomes audience picks, locks on host start and reopens for 
     await expect.poll(() => state?.phase !== "WAITING").toBe(true);
     await expect(leaders).toBeDisabled();
     await expect(workers).toBeDisabled();
-    await expect(page.locator(".crowd-lock")).toHaveText("PICKS LOCKED");
+    await expect(page.locator(".crowd-lock")).toHaveText("Bets locked");
     const locked = await context.request.post(
       "http://127.0.0.1:3100/api/audience",
       { data: { team: "LEADERS", roundId: state!.predictions.roundId } },
     );
     expect(locked.status()).toBe(409);
     command("end");
-    await expect(page.locator("#your-prediction")).toContainText(
-      "No result this time",
-    );
+    await expect(page.locator("#your-prediction")).toContainText("No result");
     command("rematch_lobby");
     await expect(leaders).toBeEnabled();
     await expect(workers).toHaveAttribute("aria-pressed", "false");
-    await expect(page.locator(".crowd-heading > strong")).toHaveText(
-      "0 audience picks",
-    );
+    await expect(page.locator(".crowd-heading > strong")).toHaveText("0 bets");
     expect(state!.players.length).toBe(12);
     expect(state!.phase).toBe("WAITING");
     expect(gameSockets).toBe(socketsBeforePrediction);

@@ -6,6 +6,7 @@ const pitches: Record<string, number[]> = {
   countdown: [660],
   pass: [280],
   shot: [140, 90],
+  ball_bounce: [200],
   go: [440, 660, 880],
   goal_scored: [523, 659, 784, 1047, 784, 1047],
   match_finished: [784, 659, 523, 1047],

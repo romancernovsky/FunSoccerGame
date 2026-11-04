@@ -49,7 +49,7 @@ test("one pick per identity, repeat is idempotent, changes replace and malformed
     );
   assert.throws(
     () => g.predictions.choose("other", "LEADERS", "old-round", now, g.phase),
-    /new prediction round/,
+    /new betting round/,
   );
 });
 test("only successful host start locks picks; pause and restart cannot reopen them", () => {

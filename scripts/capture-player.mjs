@@ -19,7 +19,7 @@ try {
   const host = await desktop.newPage(),
     player = await mobile.newPage();
   await host.goto(base + "/host");
-  await host.getByText("Run the show.").waitFor();
+  await host.getByRole("heading", { name: "Host", exact: true }).waitFor();
   await host.locator("#host-watch").waitFor();
   // Record an actual bot goal if one arrives before starting the controlled two-player demonstration.
   try {
@@ -47,8 +47,8 @@ try {
   );
   await player.goto(base + "/join");
   await player.locator("#name").fill("Maya");
-  await player.getByRole("button", { name: /JOIN GAME/ }).click();
-  await player.getByText("YOU ARE IN").waitFor();
+  await player.getByRole("button", { name: /^Play$/ }).click();
+  await player.getByText("You’re in").waitFor();
   rival = new WebSocket("ws://127.0.0.1:3106/ws");
   await new Promise((r) => rival.once("open", r));
   rival.send(

@@ -70,7 +70,7 @@ test("eyes turn rigidly with the head and team hair updates after Reorg", async 
 
   // The audience page has no existing 3D scene. Inspect the real renderer's eye
   // positions/normals, not just the parent head's rotation property.
-  await page.goto("/predict");
+  await page.goto("/bet");
   const result = await page.evaluate(
     async ({ stages, localId }) => {
       const url = "/src/renderer3d.ts";

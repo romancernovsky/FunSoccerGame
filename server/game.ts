@@ -716,26 +716,70 @@ export class Game {
         return;
       }
     }
-    ball.x += ball.vx * dt;
-    ball.y += ball.vy * dt;
+    // Small travel steps prevent a charged shot from skipping a player's body
+    // at the event server's 20–30 Hz simulation rate.
+    const steps = Math.max(
+      1,
+      Math.ceil((Math.hypot(ball.vx, ball.vy) * dt) / F.ballRadius),
+    );
+    for (let step = 0; step < steps; step++) {
+      ball.x += (ball.vx * dt) / steps;
+      ball.y += (ball.vy * dt) / steps;
+      if (Math.hypot(ball.vx, ball.vy) > 240 || now < ball.lockUntil) {
+        for (const p of ps) {
+          if (!p.connected) continue;
+          const radius =
+            p.keeper && this.inArea(p) ? 42 : F.radius + F.ballRadius;
+          const dx = ball.x - p.x,
+            dy = ball.y - p.y,
+            distance = Math.hypot(dx, dy);
+          if (distance >= radius) continue;
+          const speed = Math.hypot(ball.vx, ball.vy);
+          const nx = distance > 0.001 ? dx / distance : -ball.vx / (speed || 1),
+            ny = distance > 0.001 ? dy / distance : -ball.vy / (speed || 1);
+          ball.x = p.x + nx * (radius + 0.1);
+          ball.y = p.y + ny * (radius + 0.1);
+          const incoming = ball.vx * nx + ball.vy * ny;
+          if (incoming >= 0) continue; // Never reflect an already outgoing ball.
+          const rebound = speed > 650 ? 0.7 : 0.45;
+          ball.vx = (ball.vx - 2 * incoming * nx) * rebound;
+          ball.vy = (ball.vy - 2 * incoming * ny) * rebound;
+          ball.lastTouch = p.id;
+          ball.lockUntil = now + 150;
+          if (this.possessionTeam !== p.team) {
+            this.possessionTeam = p.team;
+            this.passes = 0;
+            this.passFrom = null;
+          }
+          this.emit("ball_bounce");
+        }
+      }
+      if (ball.y < F.ballRadius || ball.y > F.height - F.ballRadius) {
+        ball.y = clamp(ball.y, F.ballRadius, F.height - F.ballRadius);
+        ball.vy *= -0.85;
+      }
+      const inGoal =
+        ball.y - F.ballRadius > F.goalTop &&
+        ball.y + F.ballRadius < F.goalBottom;
+      if (
+        inGoal &&
+        (ball.x < -F.ballRadius || ball.x > F.width + F.ballRadius)
+      ) {
+        this.goal(ball.x < 0 ? "WORKERS" : "LEADERS", now);
+        return;
+      }
+      if (
+        !inGoal &&
+        (ball.x < F.ballRadius || ball.x > F.width - F.ballRadius)
+      ) {
+        ball.x = clamp(ball.x, F.ballRadius, F.width - F.ballRadius);
+        ball.vx *= -0.85;
+      }
+    }
     const friction = Math.pow(0.985, dt * 30);
     ball.vx *= friction;
     ball.vy *= friction;
-    if (ball.y < 9 || ball.y > 691) {
-      ball.y = clamp(ball.y, 9, 691);
-      ball.vy *= -0.85;
-    }
-    const inGoal =
-      ball.y - F.ballRadius > F.goalTop && ball.y + F.ballRadius < F.goalBottom;
-    if (inGoal && (ball.x < -F.ballRadius || ball.x > F.width + F.ballRadius)) {
-      this.goal(ball.x < 0 ? "WORKERS" : "LEADERS", now);
-      return;
-    }
-    if (!inGoal && (ball.x < 9 || ball.x > 1191)) {
-      ball.x = clamp(ball.x, 9, 1191);
-      ball.vx *= -0.85;
-    }
-    if (now >= ball.lockUntil) {
+    if (now >= ball.lockUntil && Math.hypot(ball.vx, ball.vy) <= 240) {
       const near = ps
         .filter(
           (p) =>

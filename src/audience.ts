@@ -1,6 +1,6 @@
 import { publicHeader } from "./public-header";
 import { TEAMS, type AudienceState, type Team } from "./shared";
-import { predictionSummary, predictionMark } from "./prediction-view";
+import { predictionSummary } from "./prediction-view";
 
 const escape = (s: string) =>
   s.replace(
@@ -23,7 +23,7 @@ export function startAudience(app: HTMLElement) {
   const status = () => {
     if (!state) return "CONNECTING";
     const p = state.predictions;
-    if (p.outcome === "VOID") return "MATCH ENDED · NO PREDICTION RESULT";
+    if (p.outcome === "VOID") return "MATCH ENDED";
     if (p.winner) return `${p.winner} WIN!`;
     return (
       (
@@ -32,16 +32,16 @@ export function startAudience(app: HTMLElement) {
           COUNTDOWN: "GET READY",
           PAUSED: "MATCH PAUSED",
           GOAL: "GOOOAL!",
-          REORG: "THE REORG · SAME TEAMS, NEW FACES",
+          REORG: "REORG",
           KICKOFF_COUNTDOWN: "KICKOFF",
           GOLDEN_GOAL: "GOLDEN GOAL · NEXT GOAL WINS",
         } as Record<string, string>
-      )[state.phase] ?? "LIVE FROM OFFICE ARENA"
+      )[state.phase] ?? "LIVE"
     );
   };
   function render() {
     if (!state) {
-      app.innerHTML = `<main class="audience-main public-content"><span class="eyebrow">OFFICE / ARENA</span><h1>Joining the crowd…</h1><p role="status">${escape(error || "Getting the latest match.")}</p></main>`;
+      app.innerHTML = `<main class="audience-main public-content"><h1>Bet</h1><p role="status">${escape(error || "Connecting…")}</p></main>`;
       return;
     }
     const p = state.predictions;
@@ -58,19 +58,17 @@ export function startAudience(app: HTMLElement) {
       signature = sig;
       const result =
         p.outcome === "VOID"
-          ? "No result this time. The host ended the match."
+          ? "Match ended. No result."
           : p.winner
-            ? state.pick
-              ? state.pick === p.winner
-                ? "YOU CALLED IT!"
-                : "WHAT A MATCH. NEXT ONE IS YOURS."
-              : "THE ROOM HAS ITS WINNER."
+            ? state.pick === p.winner
+              ? "Your bet won!"
+              : `${p.winner} win`
             : state.pick
-              ? `YOU'RE BACKING ${state.pick}`
+              ? `Your bet: ${state.pick}`
               : p.open
-                ? "WHO TAKES THE WIN?"
-                : "PICKS ARE LOCKED. THE SHOW IS ON.";
-      app.innerHTML = `${publicHeader("predict", online)}<main class="audience-main public-content"><span class="eyebrow">${p.open ? "YOUR SEAT IN THE STANDS" : "YOU'RE PART OF THE SHOW"}</span><h1>${p.open ? "Off the pitch.<br><em>Still in the game.</em>" : "Back your team.<br><em>Feel every goal.</em>"}</h1><p class="audience-intro">${p.open ? "Pick the team you think will win. One pick per browser. Change your mind until the host starts." : "Follow the match on the big screen. Your pick is locked in—now cheer them on!"}</p><section class="audience-match"><div class="audience-status" role="status">${status()}</div><div class="audience-score"><span>LEADERS</span><strong>${state.score.LEADERS}<i>:</i>${state.score.WORKERS}</strong><span>WORKERS</span></div><div class="audience-clock" id="audience-clock"></div></section><section class="prediction-pick"><div class="eyebrow" id="your-prediction">${result}</div><div class="prediction-options">${TEAMS.map((team) => `<button class="prediction-option ${team.toLowerCase()} ${state!.pick === team ? "is-picked" : ""}" data-predict="${team}" aria-pressed="${state!.pick === team}" ${!p.open || saving || !online ? "disabled" : ""}><span aria-hidden="true">${predictionMark(team)}</span><strong>${team}</strong><small>${state!.pick === team ? "✓ YOUR PICK" : p.open ? "PICK TO WIN" : "PICKS CLOSED"}</small></button>`).join("")}</div><p class="prediction-note">${p.open ? "Locks when the host starts · No money, just bragging rights" : state.pick ? "Your pick is locked in. Make some noise for your side!" : "You can make a pick when the next prediction lobby opens."}</p><div class="prediction-error" role="alert">${escape(error)}</div></section>${predictionSummary(p)}<p class="audience-connection" role="status">${online ? "● LIVE MATCH UPDATES" : "Reconnecting… Showing the last update."}</p><p class="prediction-fineprint">No accounts. No stakes. Just a room full of opinions.</p></main>`;
+                ? "Choose a team"
+                : "Bets closed";
+      app.innerHTML = `${publicHeader("bet", online)}<main class="audience-main public-content simple-panel"><h1>Bet on the winner</h1><p class="bet-note">For fun. No money.</p>${state.phase !== "WAITING" ? `<section class="audience-match"><div class="audience-status" role="status">${status()}</div><div class="audience-score"><span>LEADERS</span><strong>${state.score.LEADERS}<i>:</i>${state.score.WORKERS}</strong><span>WORKERS</span></div><div class="audience-clock" id="audience-clock"></div></section>` : ""}<section class="prediction-pick"><p id="your-prediction" role="status">${result}</p><div class="prediction-options">${TEAMS.map((team) => `<button class="prediction-option ${team.toLowerCase()} ${state!.pick === team ? "is-picked" : ""}" data-predict="${team}" aria-pressed="${state!.pick === team}" ${!p.open || saving || !online ? "disabled" : ""}><strong>${team}</strong><small>${state!.pick === team ? "✓ Your bet" : p.open ? "Bet" : "Closed"}</small></button>`).join("")}</div>${p.open ? '<p class="prediction-note">Bets close when the host starts.</p>' : ""}<div class="prediction-error" role="alert">${escape(error)}</div></section>${predictionSummary(p)}${!online ? '<p class="audience-connection" role="status">Reconnecting…</p>' : ""}</main>`;
       app
         .querySelectorAll<HTMLButtonElement>("[data-predict]")
         .forEach((button) =>
@@ -93,7 +91,7 @@ export function startAudience(app: HTMLElement) {
   async function response(res: Response) {
     const data = await res.json();
     if (!res.ok)
-      throw Error(data.message || "Couldn't save your pick. Try again.");
+      throw Error(data.message || "Couldn't save your bet. Try again.");
     return data as AudienceState;
   }
   async function refresh() {
@@ -141,9 +139,8 @@ export function startAudience(app: HTMLElement) {
     } catch (e) {
       if (e instanceof TypeError || e instanceof DOMException) {
         online = false;
-        error = "Couldn't save your pick. Reconnecting…";
-      } else
-        error = e instanceof Error ? e.message : "Couldn't save your pick.";
+        error = "Couldn't save your bet. Reconnecting…";
+      } else error = e instanceof Error ? e.message : "Couldn't save your bet.";
     } finally {
       saving = false;
       render();

@@ -74,8 +74,8 @@ try {
   p.on("pageerror", (e) => console.log("page error", e.message));
   await p.goto("http://localhost:3106/join");
   await p.locator("#name").fill("Maya");
-  await p.getByRole("button", { name: /JOIN GAME/ }).click();
-  await p.getByText("YOU ARE IN").waitFor();
+  await p.getByRole("button", { name: /^Play$/ }).click();
+  await p.getByText("You’re in").waitFor();
   rival = new WebSocket("ws://localhost:3106/ws");
   await new Promise((r) => rival.once("open", r));
   rival.send(
