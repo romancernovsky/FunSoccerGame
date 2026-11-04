@@ -1,0 +1,103 @@
+/* Sound needs a visible, explicit unlock before the meeting starts. */
+.audio-panel {
+  max-width: 1416px;
+  margin: 18px auto 0;
+  width: 92%;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #accfde30;
+  border-radius: 10px;
+  background: #102b3a;
+}
+.audio-description {
+  min-width: 0;
+}
+.audio-description strong {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.audio-description [role="status"] {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #bcd0d8;
+}
+.audio-panel[data-status="blocked"] {
+  border-color: #e6b77b;
+}
+.audio-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: none;
+}
+.audio-panel button {
+  min-height: 44px;
+  font-size: 14px;
+}
+.audio-panel label,
+.watch-volume {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  letter-spacing: 0;
+  color: #bcd0d8;
+}
+.audio-panel input,
+.watch-volume input {
+  width: 104px;
+  height: 44px;
+  accent-color: #dafa95;
+}
+.watch-volume {
+  align-self: center;
+}
+.watch-volume input {
+  width: 72px;
+}
+.broadcast-view .audio-panel {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .audio-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .audio-actions {
+    flex: auto;
+  }
+  .audio-actions button {
+    font-size: 16px;
+  }
+  .watch-volume {
+    font-size: 12px;
+    gap: 6px;
+  }
+}
+@media (max-width: 600px) {
+  .audio-panel {
+    width: calc(100% - 32px);
+    padding: 16px;
+  }
+  .audio-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .audio-actions button {
+    padding: 10px;
+  }
+  .audio-actions label {
+    grid-column: 1/-1;
+  }
+  .audio-actions input {
+    flex: 1;
+    min-width: 0;
+  }
+}

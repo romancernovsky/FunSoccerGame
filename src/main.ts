@@ -1,3 +1,5 @@
+import { MatchAudio } from "./audio";
+import "./audio.css";
 import { publicHeader } from "./public-header";
 import { displayCapabilities, showDisplayHelp } from "./display-mode";
 import { startAudience } from "./audience";
@@ -54,12 +56,10 @@ let state: Snapshot | null = null,
   retry = 0,
   replaced = false;
 let serverOffset = 0,
-  lastEvent = 0,
-  audio: AudioContext | null = null,
-  sound = false,
-  volume = 0.35,
   charging = false,
   chargeStarted = 0;
+const matchAudio =
+  !join && route !== "/predict" ? new MatchAudio(updateAudioUI) : null;
 const input: Input = { x: 0, y: 0, action: false, dash: false };
 let keys = new Set<string>();
 let joystick = { x: 0, y: 0 };
@@ -114,10 +114,7 @@ function connect() {
           stopInput();
         state = msg.data;
         serverOffset = state!.now - Date.now();
-        if (state!.event.id !== lastEvent) {
-          if (lastEvent && sound) playSound(state!.event.kind);
-          lastEvent = state!.event.id;
-        }
+        matchAudio?.observe(state!);
         render();
         break;
       case "identity":
@@ -300,8 +297,58 @@ function playerToolbar() {
   const attackRight = me()?.team !== "WORKERS";
   return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow my player" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "PLAYER" : "FIELD"}</span></button><span class="attack-direction ${me()?.team.toLowerCase() ?? ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
 }
+function audioLabel() {
+  return {
+    off: "Enable sound",
+    enabling: "Enabling…",
+    on: "Sound on",
+    blocked: "Resume sound",
+    unavailable: "Sound unavailable",
+  }[matchAudio?.status ?? "off"];
+}
+function audioPanel() {
+  if (!matchAudio) return "";
+  return `<section class="audio-panel" aria-label="Match audio"><div class="audio-description"><strong>Match sound</strong><span id="audio-status" role="status"></span></div><div class="audio-actions"><button id="sound" class="primary compact" data-audio-action="toggle" aria-pressed="${matchAudio.ready}">${audioLabel()}</button><button id="test-sound" class="secondary compact" data-audio-action="test">Test sound</button><label>Volume<input id="volume" data-audio-volume aria-label="Master volume" type="range" min="0" max="1" step="0.05" value="${matchAudio.volume}"></label></div></section>`;
+}
+function updateAudioUI() {
+  if (!matchAudio) return;
+  const { status, volume } = matchAudio;
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-audio-action="toggle"]')
+    .forEach((button) => {
+      button.textContent = audioLabel();
+      button.setAttribute("aria-pressed", String(matchAudio.ready));
+      button.disabled = status === "unavailable";
+    });
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-audio-action="test"]')
+    .forEach((button) => {
+      button.disabled = status === "enabling" || status === "unavailable";
+    });
+  document
+    .querySelectorAll<HTMLInputElement>("[data-audio-volume]")
+    .forEach((slider) => {
+      slider.value = String(volume);
+    });
+  const panel = document.querySelector<HTMLElement>(".audio-panel");
+  if (panel) panel.dataset.status = status;
+  const message = document.querySelector("#audio-status");
+  if (message)
+    message.textContent = {
+      off: "Enable sound on the display or tab you will broadcast.",
+      enabling: "Waiting for browser audio…",
+      on:
+        volume === 0
+          ? "Volume is 0%. Raise the volume to hear the match."
+          : `Sound enabled · ${Math.round(volume * 100)}% volume. Test your speakers before starting.`,
+      blocked:
+        "Audio was blocked or interrupted. Tap Resume sound. Check device volume if it stays silent.",
+      unavailable:
+        "This browser could not start audio. Try Safari, Chrome or Edge.",
+    }[status];
+}
 function watchToolbar() {
-  return `<div class="watch-toolbar"><span class="eyebrow"><i class="live-dot"></i> LIVE BROADCAST</span><div><button class="secondary compact" id="watch-sound">${sound ? "◖ Sound on" : "◖ Enable sound"}</button><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "↙ Exit broadcast" : "⛶ Broadcast mode"}</button></div></div>`;
+  return `<div class="watch-toolbar"><span class="eyebrow"><i class="live-dot"></i> LIVE BROADCAST</span><div><button class="secondary compact" id="watch-sound" data-audio-action="toggle" aria-pressed="${matchAudio?.ready ?? false}">${audioLabel()}</button><button class="secondary compact" data-audio-action="test">Test sound</button><label class="watch-volume">Volume<input id="watch-volume" data-audio-volume aria-label="Broadcast volume" type="range" min="0" max="1" step="0.05" value="${matchAudio?.volume ?? 0.6}"></label><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}">${followCamera ? "◎ Ball-follow camera" : "▣ Full field"}</button><button class="primary compact" id="broadcast-mode" aria-pressed="${broadcast}">${broadcast ? "↙ Exit broadcast" : "⛶ Broadcast mode"}</button></div></div>`;
 }
 function hostPanel() {
   if (!hostReady)
@@ -357,7 +404,8 @@ function render() {
     signature = sig;
     app.innerHTML =
       header() +
-      `<main class="${join && active() && me() ? "game-main" : host ? "" : "public-content"}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main><footer><span>OFFICE ARENA <i>© 2026</i></span><span>A LITTLE RIVALRY. A LOT OF TEAM SPIRIT.</span><div>${!join ? `<button id="sound">${sound ? "◖ SOUND ON" : "◖ ENABLE SOUND"}</button><input id="volume" aria-label="Master volume" type="range" min="0" max="1" step="0.05" value="${volume}">` : ""}<span>BUILT FOR THE TEAM.</span></div></footer>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
+      audioPanel() +
+      `<main class="${join && active() && me() ? "game-main" : host ? "" : "public-content"}">${host ? hostPanel() : join ? joinPanel() : spectator()}</main><footer><span>OFFICE ARENA <i>© 2026</i></span><span>A LITTLE RIVALRY. A LOT OF TEAM SPIRIT.</span><div><span>BUILT FOR THE TEAM.</span></div></footer>${notice ? `<div class="toast">${esc(notice)}</div>` : ""}`;
     const n = document.querySelector<HTMLInputElement>("#name");
     if (n) n.value = name;
     bind();
@@ -439,11 +487,6 @@ function bind() {
     ?.addEventListener("click", () => {
       setPlayerFullscreen(!playerFullscreen);
     });
-  document
-    .querySelector("#watch-sound")
-    ?.addEventListener("click", () =>
-      document.querySelector<HTMLButtonElement>("#sound")?.click(),
-    );
   document.querySelector("#camera-mode")?.addEventListener("click", () => {
     followCamera = !followCamera;
     signature = "";
@@ -494,20 +537,22 @@ function bind() {
       document.documentElement.requestFullscreen?.();
     else document.exitFullscreen?.();
   });
-  document.querySelector("#sound")?.addEventListener("click", () => {
-    audio ??= new AudioContext();
-    void audio.resume();
-    sound = !sound;
-    signature = "";
-    render();
-    if (sound) playSound("go");
-  });
   document
-    .querySelector("#volume")
-    ?.addEventListener(
-      "input",
-      (e) => (volume = Number((e.target as HTMLInputElement).value)),
-    );
+    .querySelectorAll<HTMLButtonElement>("[data-audio-action]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.audioAction === "test") matchAudio?.test();
+        else matchAudio?.toggle();
+      });
+    });
+  document
+    .querySelectorAll<HTMLInputElement>("[data-audio-volume]")
+    .forEach((slider) => {
+      slider.addEventListener("input", () =>
+        matchAudio?.setVolume(Number(slider.value)),
+      );
+    });
+  updateAudioUI();
   const stick = document.querySelector<HTMLElement>("#joystick");
   if (stick) {
     let pointer = -1;
@@ -642,67 +687,6 @@ setInterval(() => {
   send("input", input);
   if (!dash) input.dash = false;
 }, 50);
-function playSound(kind: string) {
-  if (!audio || !sound) return;
-  const pitches: Record<string, number[]> = {
-    pass: [280],
-    shot: [140, 90],
-    go: [440, 660, 880],
-    goal_scored: [523, 659, 784, 1047, 784, 1047],
-    match_finished: [784, 659, 523, 1047],
-    final_minute: [440, 440, 660],
-    golden_goal_started: [330, 660, 990],
-    reorg_started: [220, 165, 330, 440, 660, 880],
-    reorg_kickoff: [440, 660],
-  };
-  const notes = pitches[kind];
-  if (!notes) return;
-  notes.forEach((freq, i) => {
-    const o = audio!.createOscillator(),
-      g = audio!.createGain(),
-      at = audio!.currentTime + i * 0.12;
-    o.type = kind === "goal_scored" ? "triangle" : "sine";
-    o.frequency.setValueAtTime(freq, at);
-    g.gain.setValueAtTime(0, at);
-    g.gain.linearRampToValueAtTime(volume * 0.25, at + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.001, at + 0.3);
-    o.connect(g).connect(audio!.destination);
-    o.start(at);
-    o.stop(at + 0.32);
-  });
-  if (kind === "match_finished" || kind === "go") {
-    const whistle = audio.createOscillator(),
-      gain = audio.createGain(),
-      at = audio.currentTime;
-    whistle.frequency.setValueAtTime(2700, at);
-    whistle.frequency.linearRampToValueAtTime(2350, at + 0.35);
-    gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(volume * 0.08, at + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.4);
-    whistle.connect(gain).connect(audio.destination);
-    whistle.start(at);
-    whistle.stop(at + 0.42);
-  }
-  if (kind === "goal_scored" || kind === "match_finished") {
-    const buffer = audio.createBuffer(
-        1,
-        audio.sampleRate * 1.5,
-        audio.sampleRate,
-      ),
-      data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++)
-      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-    const source = audio.createBufferSource(),
-      filter = audio.createBiquadFilter(),
-      g = audio.createGain();
-    source.buffer = buffer;
-    filter.type = "bandpass";
-    filter.frequency.value = 900;
-    g.gain.value = volume * 0.25;
-    source.connect(filter).connect(g).connect(audio.destination);
-    source.start();
-  }
-}
 let world3d: Arena3D | null = null;
 let graphicsFailed = false;
 let graphicsPaused = false;
@@ -739,7 +723,6 @@ function warmArena() {
   }, 0);
 }
 let prev = performance.now();
-let countdownNote = -1;
 let overlayHtml = "";
 let overlayElement: HTMLElement | null = null;
 let camera: Camera = overview();
@@ -841,11 +824,7 @@ function draw(time: number) {
       Math.ceil((state.deadline - (Date.now() + serverOffset)) / 1000),
     );
     html = `<span class="eyebrow">${n > 3 ? "GET READY" : "GET SET"}</span><strong>${n > 3 ? "GET READY" : n}</strong><p>MOVE · Joystick &nbsp; PASS · Tap &nbsp; SHOOT · Hold &nbsp; DASH · Button</p>`;
-    if (n !== countdownNote && sound) {
-      playSound("go");
-      countdownNote = n;
-    }
-  } else countdownNote = -1;
+  }
   if (phase === "REORG") {
     html = reorgView(state, identity);
     drawCelebration(ctx, time, true);
