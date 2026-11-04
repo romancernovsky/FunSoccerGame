@@ -704,7 +704,8 @@ export class Arena3D {
       let delta = angle - a.body.rotation.y;
       delta = Math.atan2(Math.sin(delta), Math.cos(delta));
       a.body.rotation.y += delta * smoothing;
-      a.head.rotation.y = -a.body.rotation.y * 0.88;
+      // The head inherits the body's smoothed movement heading.
+      a.head.rotation.y = 0;
       a.body.rotation.x = state.now < p.dashUntil ? -0.15 : 0;
       a.pointer.position.set(p.fx * 0.37, 0.028, p.fy * 0.37);
       a.pointer.rotation.y = Math.atan2(p.fx, p.fy);
