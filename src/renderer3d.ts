@@ -987,7 +987,8 @@ export class Arena3D {
       Math.min(this.height - 14, this.height / 2 + dy * t),
     );
     // An edge-attached cue cannot be mistaken for another character's YOU badge.
-    if (mobile && py < 30) px = Math.max(80, Math.min(this.width - 80, px));
+    // Keep the edge cue clear of the phone's sound and fullscreen controls.
+    if (mobile && py < 30) px = Math.max(80, Math.min(this.width - 136, px));
     if (mobile && py > this.height - 112 && (px < 120 || px > this.width - 160))
       px = Math.max(130, Math.min(this.width - 174, px));
     c.canvas.dataset.playerIndicatorX = px.toFixed(1);

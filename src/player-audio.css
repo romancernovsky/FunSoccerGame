@@ -1,0 +1,127 @@
+/* Sound settings stay inside one touch target and never take space from the pitch. */
+.waiting-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.player-toolbar {
+  gap: 4px;
+}
+.player-audio {
+  position: relative;
+  flex: none;
+  z-index: 30;
+}
+.player-audio summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #aacbd83d;
+  border-radius: 8px;
+  background: #102b3a;
+  color: #bbd3dc;
+  font:
+    600 15px/1.2 "DM Sans",
+    sans-serif;
+  cursor: pointer;
+  list-style: none;
+  touch-action: manipulation;
+}
+.player-audio summary::-webkit-details-marker {
+  display: none;
+}
+.player-audio summary::marker {
+  content: "";
+}
+.player-audio summary:focus-visible {
+  outline: 2px solid #dfff94;
+  outline-offset: 2px;
+}
+.player-audio summary svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.player-audio .sound-waves {
+  display: none;
+}
+.player-audio[data-status="on"] .sound-waves {
+  display: initial;
+}
+.player-audio[data-status="on"] .sound-muted {
+  display: none;
+}
+.player-audio[data-status="on"] summary {
+  color: #dfff94;
+}
+.player-audio[data-status="blocked"] summary {
+  color: #ffd09c;
+  border-color: #ffd09c;
+}
+.player-audio.compact-audio summary {
+  width: 44px;
+  padding: 10px;
+  background: #0b2435a6;
+}
+.player-audio-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 220px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid #aacbd859;
+  border-radius: 10px;
+  background: #0b2435f7;
+  box-shadow: 0 8px 28px #030c16a6;
+  color: #d2e3eb;
+  text-align: left;
+}
+.player-audio-menu button {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 16px;
+}
+.player-audio-menu label {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  font-size: 15px;
+  color: #c9dce4;
+}
+.player-audio-menu input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  accent-color: #dfff94;
+}
+.player-audio-menu [role="status"] {
+  font:
+    500 12px/1.3 "DM Sans",
+    sans-serif;
+  color: #aec6d2;
+}
+.player-audio-menu [role="status"]:empty {
+  display: none;
+}
+.player-audio:not([open]) .player-audio-menu {
+  display: none;
+}
+@media (pointer: coarse) and (orientation: landscape) {
+  .game-main .balls-remaining {
+    top: 26px;
+  }
+  .game-main .player-audio-menu {
+    padding: 10px;
+    gap: 6px;
+  }
+}

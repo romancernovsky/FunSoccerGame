@@ -195,6 +195,7 @@ type Client = {
   ws: WebSocket;
   id: string | null;
   host: boolean;
+  audio: boolean;
   count: number;
   window: number;
   alive: boolean;
@@ -232,6 +233,7 @@ wss.on("connection", (ws) => {
     ws,
     id: null,
     host: false,
+    audio: false,
     count: 0,
     window: Date.now(),
     alive: true,
@@ -294,6 +296,12 @@ wss.on("connection", (ws) => {
             throw Error("Invalid command.");
           game.command(d.action, d, now);
           break;
+        case "audio":
+          if (typeof d?.enabled !== "boolean")
+            throw Error("Invalid audio preference.");
+          c.audio = d.enabled;
+          send(c, "audio_ready", { enabled: c.audio });
+          break;
         case "input":
           if (c.id) game.input(c.id, d, now);
           break;
@@ -334,7 +342,7 @@ const simulation = setInterval(() => {
         c.ws.terminate();
         continue;
       }
-      send(c, "state", game.snapshot(Date.now(), !c.id));
+      send(c, "state", game.snapshot(Date.now(), !c.id || c.audio));
     }
   } catch (e) {
     console.error(

@@ -44,6 +44,9 @@ try {
         }),
       );
       ids.push((await response).id);
+      const audioReady = waitFor(ws, "audio_ready");
+      ws.send(JSON.stringify({ type: "audio", data: { enabled: true } }));
+      assert.equal((await audioReady).enabled, true);
     }
   }
   const host = clients[12],
@@ -72,6 +75,9 @@ try {
   await new Promise((r) => setTimeout(r, 5000));
   assert.equal(states.length, 20);
   assert.ok(states.every((s) => s.players.length === 12));
+  assert.ok(
+    states.every((s) => Array.isArray(s.events) && s.events.length <= 64),
+  );
   assert.ok(states.every((s) => s.remaining < 180));
   assert.ok(
     states.every(
@@ -87,7 +93,7 @@ try {
       0.2,
   );
   console.log(
-    "PASS: 20 connections, 12 simultaneous players, synchronized snapshots.",
+    "PASS: 20 connections, 12 simultaneous players with audio, synchronized snapshots.",
   );
 } finally {
   if (interval) clearInterval(interval);

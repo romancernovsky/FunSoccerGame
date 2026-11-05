@@ -39,6 +39,7 @@ import "./style.css";
 import "./mobile-game.css";
 import "./mobile-pages.css";
 import "./multiball.css";
+import "./player-audio.css";
 const arrow =
   '<svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -63,7 +64,20 @@ let serverOffset = 0,
   charging = false,
   chargeStarted = 0;
 const matchAudio =
-  !join && route !== "/bet" ? new MatchAudio(updateAudioUI) : null;
+  route !== "/bet"
+    ? new MatchAudio(
+        updateAudioUI,
+        join ? "office-arena-player-audio" : undefined,
+      )
+    : null;
+let audioSubscription: boolean | null = null;
+function syncPlayerAudio() {
+  if (!join || ws?.readyState !== WebSocket.OPEN) return;
+  const enabled = !!identity && !!matchAudio?.ready;
+  if (audioSubscription === enabled) return;
+  audioSubscription = enabled;
+  send("audio", { enabled });
+}
 const input: Input = { x: 0, y: 0, action: false, dash: false };
 let keys = new Set<string>();
 let joystick = { x: 0, y: 0 };
@@ -101,8 +115,10 @@ function connect() {
   ws.onopen = () => {
     connected = true;
     retry = 0;
+    audioSubscription = null;
     if (token && join) send("reconnect", { token });
     if (host) send("host", {});
+    syncPlayerAudio();
     signature = "";
     render();
   };
@@ -121,13 +137,15 @@ function connect() {
           stopInput();
         state = msg.data;
         serverOffset = state!.now - Date.now();
-        matchAudio?.observe(state!);
+        if (!join || me()) matchAudio?.observe(state!);
         render();
         break;
       case "identity":
         identity = msg.data.id;
         token = msg.data.token;
         localStorage.setItem("lvw-session", token!);
+        if (state && me()) matchAudio?.observe(state);
+        syncPlayerAudio();
         error = "";
         signature = "";
         render();
@@ -151,6 +169,8 @@ function connect() {
         identity = null;
         token = null;
         localStorage.removeItem("lvw-session");
+        matchAudio?.stopMatch();
+        syncPlayerAudio();
         signature = "";
         render();
         break;
@@ -159,6 +179,8 @@ function connect() {
         identity = null;
         token = null;
         localStorage.removeItem("lvw-session");
+        matchAudio?.stopMatch();
+        syncPlayerAudio();
         notice = "This player session is open in another tab.";
         break;
     }
@@ -309,7 +331,7 @@ function playerToolbar() {
         : "Fullscreen options"
       : `${playerFullscreen ? "Exit" : "Enter"} full screen`;
   const attackRight = me()?.team !== "ORANGE";
-  return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow the ball" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "BALL" : "FIELD"}</span></button><span class="attack-direction ${me() ? teamClass(me()!.team) : ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
+  return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow the ball" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "BALL" : "FIELD"}</span></button><span class="attack-direction ${me() ? teamClass(me()!.team) : ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar">${playerAudioControls(true)}<button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
 }
 function audioLabel() {
   return {
@@ -320,14 +342,27 @@ function audioLabel() {
     unavailable: "Sound unavailable",
   }[matchAudio?.status ?? "off"];
 }
+function playerAudioControls(compact = false) {
+  if (!matchAudio) return "";
+  return `<details class="player-audio ${compact ? "compact-audio" : ""}" data-player-audio data-status="${matchAudio.status}"><summary aria-label="Sound settings: ${audioLabel()}" title="Sound settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="sound-waves" d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/><path class="sound-muted" d="m16 9 6 6m0-6-6 6"/></svg>${compact ? "" : "<span>Sound</span>"}</summary><div class="player-audio-menu" role="group" aria-label="Player sound controls"><button class="secondary" data-audio-action="toggle" aria-pressed="${matchAudio.ready}">${audioLabel()}</button><label for="player-volume">Volume<input id="player-volume" data-audio-volume aria-label="Game sound volume" type="range" min="0" max="1" step="0.05" value="${matchAudio.volume}"></label><span id="audio-status" role="status"></span></div></details>`;
+}
 function audioPanel(embedded = false) {
-  if (!matchAudio || (!embedded && host && active())) return "";
+  if (!matchAudio || join || (!embedded && host && active())) return "";
   return `<section class="audio-panel ${embedded ? "watch-audio" : ""}" aria-label="Match audio"><div class="audio-actions"><button id="sound" class="secondary compact" data-audio-action="toggle" aria-pressed="${matchAudio.ready}">${audioLabel()}</button><button id="test-sound" class="secondary compact" data-audio-action="test">Test sound</button><label>Volume<input id="volume" data-audio-volume aria-label="Master volume" type="range" min="0" max="1" step="0.05" value="${matchAudio.volume}"></label></div><span id="audio-status" role="status"></span></section>`;
 }
 function updateAudioUI() {
   if (!matchAudio) return;
   const { status, volume } = matchAudio;
   document.body.dataset.audioStatus = status;
+  syncPlayerAudio();
+  document
+    .querySelectorAll<HTMLElement>("[data-player-audio]")
+    .forEach((panel) => {
+      panel.dataset.status = status;
+      panel
+        .querySelector("summary")
+        ?.setAttribute("aria-label", `Sound settings: ${audioLabel()}`);
+    });
   document
     .querySelectorAll<HTMLButtonElement>('[data-audio-action="toggle"]')
     .forEach((button) => {
@@ -374,7 +409,7 @@ function joinPanel() {
     if (active())
       return `<div class="player-game">${playerToolbar()}${scoreboard(true)}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${teamClass(p.team)}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
     const teammates = state!.players.filter((q) => q.team === p.team);
-    return `<section class="waiting-layout simple-panel"><h1>You’re in</h1><p class="joined-identity"><strong>${esc(p.name)}</strong><span class="${teamClass(p.team)}">${teamName(p.team)}${p.keeper ? " 🧤" : ""}</span></p><div class="waiting-pill" role="status"><i></i>Waiting for host…</div><div class="waiting-team"><h2>Your team <span>${teammates.length} / ${state!.maxTeamSize}</span></h2><ul>${teammates.map((q) => `<li>${esc(q.name)}${q.keeper ? " 🧤" : ""}${!q.connected ? "<small>Reconnecting…</small>" : ""}</li>`).join("")}</ul></div></section>`;
+    return `<section class="waiting-layout simple-panel"><div class="waiting-heading"><h1>You’re in</h1>${playerAudioControls()}</div><p class="joined-identity"><strong>${esc(p.name)}</strong><span class="${teamClass(p.team)}">${teamName(p.team)}${p.keeper ? " 🧤" : ""}</span></p><div class="waiting-pill" role="status"><i></i>Waiting for host…</div><div class="waiting-team"><h2>Your team <span>${teammates.length} / ${state!.maxTeamSize}</span></h2><ul>${teammates.map((q) => `<li>${esc(q.name)}${q.keeper ? " 🧤" : ""}${!q.connected ? "<small>Reconnecting…</small>" : ""}</li>`).join("")}</ul></div></section>`;
   }
   if (active())
     return `<section class="simple-panel join-unavailable"><h1>Match in progress</h1><p>Next game soon.</p><a class="secondary" href="/bet">Bet</a></section>`;
@@ -518,6 +553,7 @@ function bind() {
   });
   document.querySelector("#join-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
+    matchAudio?.enableForMatch();
     send("join", {
       name: (document.querySelector("#name") as HTMLInputElement).value,
       team: selected,
@@ -583,6 +619,7 @@ function bind() {
       knob.style.transform = `translate(${joystick.x * travel}px,${joystick.y * travel}px)`;
     };
     stick.onpointerdown = (e) => {
+      matchAudio?.enableForMatch();
       pointer = e.pointerId;
       stick.setPointerCapture(pointer);
       move(e);
@@ -597,6 +634,7 @@ function bind() {
   const shoot = document.querySelector<HTMLElement>("#shoot");
   if (shoot) {
     shoot.onpointerdown = (e) => {
+      matchAudio?.enableForMatch();
       shoot.setPointerCapture(e.pointerId);
       setAction(true);
     };
@@ -605,6 +643,7 @@ function bind() {
   const dash = document.querySelector<HTMLElement>("#dash");
   if (dash) {
     dash.onpointerdown = (e) => {
+      matchAudio?.enableForMatch();
       dash.setPointerCapture(e.pointerId);
       input.dash = true;
       send("input", input);
@@ -637,6 +676,7 @@ window.addEventListener("keydown", (e) => {
     !state ||
     !["PLAYING", "GOLDEN_GOAL"].includes(state.phase) ||
     (e.target as HTMLElement).matches("input") ||
+    !!(e.target as HTMLElement).closest("[data-player-audio]") ||
     !!document.querySelector("dialog[open]")
   )
     return;
@@ -657,6 +697,7 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     // A key held through a pause/countdown must be released before it can move again.
     if (e.repeat && !keys.has(e.key.toLowerCase())) return;
+    matchAudio?.enableForMatch();
     keys.add(e.key.toLowerCase());
     if (e.key === " " && !e.repeat) setAction(true);
     if (e.key === "Shift" && !e.repeat) {
@@ -673,6 +714,12 @@ window.addEventListener("keyup", (e) => {
     input.dash = false;
     if (join && identity) send("input", input);
   }
+});
+document.addEventListener("pointerdown", (event) => {
+  const panel = document.querySelector<HTMLDetailsElement>(
+    "[data-player-audio]",
+  );
+  if (panel?.open && !panel.contains(event.target as Node)) panel.open = false;
 });
 window.addEventListener("blur", stopInput);
 document.addEventListener("visibilitychange", () => {

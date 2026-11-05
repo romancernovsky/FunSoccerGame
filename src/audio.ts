@@ -37,7 +37,7 @@ const COOLDOWN: Record<string, number> = {
   shot_charge: 140,
   pass_completed: 160,
 };
-/** One audio source for a host/projector page, never for player phones. */
+/** Recorded match audio shared by player, host and projector views. */
 export class MatchAudio {
   status: AudioStatus = "off";
   volume = 0.6;
@@ -63,7 +63,21 @@ export class MatchAudio {
   private countdown = "";
   private previousSessionType: string | undefined;
 
-  constructor(private changed: () => void) {
+  constructor(
+    private changed: () => void,
+    private settingsKey?: string,
+  ) {
+    if (settingsKey) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(settingsKey) ?? "null");
+        if (saved && typeof saved.muted === "boolean")
+          this.mutedByUser = saved.muted;
+        if (saved && Number.isFinite(saved.volume))
+          this.volume = Math.max(0, Math.min(1, saved.volume));
+      } catch {
+        /* Storage restrictions must not block playback. */
+      }
+    }
     void preloadRecordings().catch(() => {});
     document.addEventListener("visibilitychange", () => {
       // A presenter may switch to the meeting tab while sharing this one.
@@ -88,6 +102,7 @@ export class MatchAudio {
     if (this.ready || this.pending) this.mute();
     else {
       this.mutedByUser = false;
+      this.saveSettings();
       void this.activate(true, this.status === "blocked");
     }
   }
@@ -95,10 +110,11 @@ export class MatchAudio {
     if (this.ready) this.play("test");
     else if (!this.pending) {
       this.mutedByUser = false;
+      this.saveSettings();
       void this.activate(true, this.status === "blocked");
     }
   }
-  /** Call inside the host's start/resume/broadcast click, before any await. */
+  /** Call inside a start/join/control gesture, before any await. */
   enableForMatch() {
     if (!this.mutedByUser && !this.ready && !this.pending)
       void this.activate(false, this.status === "blocked");
@@ -106,6 +122,7 @@ export class MatchAudio {
   setVolume(value: number) {
     if (!Number.isFinite(value)) return;
     this.volume = Math.max(0, Math.min(1, value));
+    this.saveSettings();
     if (this.master && this.context) {
       this.setGain(this.volume, true);
     }
@@ -114,11 +131,28 @@ export class MatchAudio {
   mute() {
     this.wanted = false;
     this.mutedByUser = true;
+    this.saveSettings();
     ++this.attempt;
     this.pending = false;
     this.releaseContext();
     this.session(false);
     this.publish("off");
+  }
+  private saveSettings() {
+    if (!this.settingsKey) return;
+    try {
+      localStorage.setItem(
+        this.settingsKey,
+        JSON.stringify({ muted: this.mutedByUser, volume: this.volume }),
+      );
+    } catch {
+      /* Playback still works without saved preferences. */
+    }
+  }
+  stopMatch() {
+    this.playing = false;
+    this.stopVoices();
+    this.syncAmbience();
   }
   recover() {
     if (this.wanted && !this.ready && !this.pending && !document.hidden)

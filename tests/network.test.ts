@@ -93,10 +93,52 @@ test(
         "identity",
       );
       assert.equal(same.id, identity.id);
+      const nextState = (check: (state: any) => boolean) =>
+        new Promise<any>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            ws.off("message", read);
+            reject(Error("Audio subscription state timeout"));
+          }, 2000);
+          const read = (raw: unknown) => {
+            const message = JSON.parse(String(raw));
+            if (message.type === "state" && check(message.data)) {
+              clearTimeout(timer);
+              ws.off("message", read);
+              resolve(message.data);
+            }
+          };
+          ws.on("message", read);
+        });
+      assert.equal(
+        (await nextState((state) => !state.events)).events,
+        undefined,
+      );
+      assert.equal(
+        (await request("audio", { enabled: true }, "audio_ready")).enabled,
+        true,
+      );
+      assert.ok(
+        Array.isArray(
+          (await nextState((state) => Array.isArray(state.events))).events,
+        ),
+      );
+      assert.equal(
+        (await request("audio", { enabled: false }, "audio_ready")).enabled,
+        false,
+      );
+      assert.equal(
+        (await nextState((state) => !state.events)).events,
+        undefined,
+      );
+      assert.match(
+        (await request("audio", { enabled: "yes" }, "error")).message,
+        /Invalid audio/,
+      );
       // Another connection does not inherit the first host's control role.
       const refreshedHost = new WebSocket("ws://127.0.0.1:3102/ws");
       clients.push(refreshedHost);
       await new Promise((r) => refreshedHost.once("open", r));
+      await request("audio", { enabled: true }, "audio_ready", refreshedHost);
       assert.match(
         (
           await request(

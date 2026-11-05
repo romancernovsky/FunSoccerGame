@@ -790,3 +790,175 @@ test("an open host hears new goals after a backend restart resets event numbers"
   expect(result).toBe(1);
   await page.evaluate(() => (window as any).__engine.mute());
 });
+
+test("player phones unlock on Play, recover on a gameplay tap and remember mute/volume without shrinking the pitch", async ({
+  browser,
+}) => {
+  const host = await hostControl();
+  const rival = new WebSocket("ws://127.0.0.1:3100/ws");
+  await new Promise((resolve) => rival.once("open", resolve));
+  rival.send(
+    JSON.stringify({ type: "join", data: { name: "Sam", team: "ORANGE" } }),
+  );
+  const context = await browser.newContext({
+    viewport: { width: 740, height: 260 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  let packet: Snapshot | undefined;
+  page.on("websocket", (socket) => {
+    if (new URL(socket.url()).pathname !== "/ws") return;
+    socket.on("framereceived", (frame) => {
+      const m = JSON.parse(String(frame.payload));
+      if (m.type === "state") packet = m.data;
+    });
+  });
+  await probe(page);
+  try {
+    await page.goto("/join");
+    expect(await page.evaluate(() => (window as any).__contexts.length)).toBe(
+      0,
+    );
+    await expect(page.locator(".audio-panel, [data-player-audio]")).toHaveCount(
+      0,
+    );
+    await page.locator("#name").fill("Tess");
+    await page.getByRole("button", { name: "Play", exact: true }).tap();
+    const settings = page.locator("[data-player-audio]");
+    await expect(page.locator(".joined-identity")).toContainText("Tess");
+    await expect(settings).toHaveAttribute("data-status", "on");
+    await expect.poll(() => Array.isArray(packet?.events)).toBe(true);
+    await startMeter(page);
+    host.command("start");
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+    await expect.poll(() => host.state().phase).toBe("PLAYING");
+    await expect(page.locator("#arena-overlay")).toHaveClass(/playing/);
+    await expect(page.locator(".audio-panel")).toHaveCount(0);
+    expect((await page.locator("#arena").boundingBox())!.width).toBeGreaterThan(
+      700,
+    );
+    const starts = await page.evaluate(
+      () => (window as any).__contexts.at(-1).starts,
+    );
+    await page.locator("#dash").tap();
+    await expect
+      .poll(() => packet?.events?.some((e) => e.kind === "dash") ?? false)
+      .toBe(true);
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__contexts.at(-1).starts))
+      .toBeGreaterThanOrEqual(starts + 3);
+    // Browser refresh needs a new user gesture, supplied by the player's controls.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("#arena-overlay")).toHaveClass(/playing/);
+    expect(await page.evaluate(() => (window as any).__contexts.length)).toBe(
+      0,
+    );
+    await page.locator("#dash").tap();
+    await expect(settings).toHaveAttribute("data-status", "on");
+    await startMeter(page);
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.0005);
+    await settings.locator("summary").tap();
+    await expect(page.locator(".player-audio-menu")).toBeVisible();
+    await page.locator("#player-volume").focus();
+    await page.keyboard.press("Home");
+    await expect(page.locator("#audio-status")).toContainText("Volume is 0%");
+    await page.waitForTimeout(250);
+    await resetPeak(page);
+    await page.waitForTimeout(300);
+    expect(await peak(page)).toBeLessThan(0.0001);
+    for (let i = 0; i < 8; i++) await page.keyboard.press("ArrowRight");
+    await expect(page.locator("#player-volume")).toHaveValue("0.4");
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.0005);
+    await page.screenshot({ path: "artifacts/audio/phone-sound-settings.png" });
+    const panel = (await page.locator(".player-audio-menu").boundingBox())!;
+    expect(panel.x).toBeGreaterThanOrEqual(0);
+    expect(panel.y + panel.height).toBeLessThanOrEqual(260);
+    await page.setViewportSize({ width: 568, height: 240 });
+    const smallPanel = (await page
+      .locator(".player-audio-menu")
+      .boundingBox())!;
+    expect(smallPanel.x).toBeGreaterThanOrEqual(0);
+    expect(smallPanel.y + smallPanel.height).toBeLessThanOrEqual(240);
+    await page.screenshot({ path: "artifacts/audio/phone-sound-small.png" });
+    await page.setViewportSize({ width: 740, height: 260 });
+    await page.locator('[data-audio-action="toggle"]').tap();
+    await expect(settings).toHaveAttribute("data-status", "off");
+    await expect.poll(() => packet?.events === undefined).toBe(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("#arena-overlay")).toHaveClass(/playing/);
+    await page.locator("#dash").tap();
+    await expect(settings).toHaveAttribute("data-status", "off");
+    expect(await page.evaluate(() => (window as any).__contexts.length)).toBe(
+      0,
+    );
+    await settings.locator("summary").tap();
+    await expect(page.locator("#player-volume")).toHaveValue("0.4");
+    await page.locator('[data-audio-action="toggle"]').tap();
+    await expect(settings).toHaveAttribute("data-status", "on");
+    await expect.poll(() => Array.isArray(packet?.events)).toBe(true);
+    await settings.locator("summary").tap();
+    await page.screenshot({ path: "artifacts/audio/phone-sound-playing.png" });
+  } finally {
+    if (!["WAITING", "FINISHED"].includes(host.state().phase))
+      host.command("end");
+    rival.close();
+    host.close();
+    await context.close();
+  }
+});
+
+test("a player phone receives and plays goal cheering from the real match", async ({
+  browser,
+}) => {
+  const host = await hostControl();
+  const context = await browser.newContext({
+    viewport: { width: 740, height: 260 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  await probe(page);
+  const goals = new Set<number>();
+  page.on("websocket", (socket) => {
+    if (new URL(socket.url()).pathname !== "/ws") return;
+    socket.on("framereceived", (frame) => {
+      const m = JSON.parse(String(frame.payload));
+      if (m.type === "state")
+        for (const e of m.data.events ?? [])
+          if (e.kind === "goal_scored") goals.add(e.id);
+    });
+  });
+  try {
+    await page.goto("/join");
+    await page.locator("#name").fill("Tess");
+    await page.getByRole("button", { name: "Play", exact: true }).tap();
+    await expect(page.locator("[data-player-audio]")).toHaveAttribute(
+      "data-status",
+      "on",
+    );
+    host.command("bots");
+    await expect.poll(() => host.state().players.length).toBe(12);
+    await startMeter(page);
+    host.command("start");
+    await expect.poll(() => goals.size, { timeout: 45000 }).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as any).__contexts
+              .at(-1)
+              .startedBuffers.filter(
+                (b: AudioBuffer) => b && b.duration > 5 && b.duration < 7,
+              ).length,
+        ),
+      )
+      .toBeGreaterThan(0);
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+  } finally {
+    if (!["WAITING", "FINISHED"].includes(host.state().phase))
+      host.command("end");
+    host.close();
+    await context.close();
+  }
+});
