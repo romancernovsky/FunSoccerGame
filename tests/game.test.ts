@@ -187,18 +187,9 @@ test("three real teammate passes qualify for Team Goal", () => {
     g.ball.x = passer.x + passer.fx * 29;
     g.ball.y = 350;
     g.release(0.1, time);
-    // The receiver runs onto the real pass, controls its rebound and keeps the
-    // sequence alive. Do not teleport a fast ball into automatic possession.
-    for (let tick = 0; tick < 120 && g.ball.owner !== receiver.id; tick++) {
+    // Stationary teammates receive an actual traveling pass on contact.
+    for (let tick = 0; tick < 30 && g.ball.owner !== receiver.id; tick++) {
       time += 1000 / 30;
-      const dx = g.ball.x - receiver.x,
-        dy = g.ball.y - receiver.y,
-        distance = Math.max(30, Math.hypot(dx, dy));
-      g.input(
-        receiver.id,
-        { x: dx / distance, y: dy / distance, action: false, dash: false },
-        time,
-      );
       g.tick(1 / 30, time);
     }
     assert.equal(g.ball.owner, receiver.id);
@@ -264,10 +255,19 @@ test("test players keep support lanes and can produce real goals", () => {
   const g = game();
   g.command("bots", {}, now);
   g.command("start", {}, now);
-  for (let i = 0; i < 1800; i++) g.tick(1 / 30, now + 4000 + (i * 1000) / 30);
+  let spreadTicks = 0;
+  for (let i = 0; i < 1800; i++) {
+    g.tick(1 / 30, now + 4000 + (i * 1000) / 30);
+    const ys = [...g.players.values()].map((p) => p.y);
+    // Goals reset everyone to the circle; measure support lanes during live play.
+    if (g.phase === "PLAYING" && Math.max(...ys) - Math.min(...ys) > 200)
+      spreadTicks++;
+  }
   assert.ok(g.score.BLUE + g.score.ORANGE > 0);
-  const ys = [...g.players.values()].map((p) => p.y);
-  assert.ok(Math.max(...ys) - Math.min(...ys) > 200);
+  assert.ok(
+    spreadTicks > 30,
+    "players maintain wide support lanes during active play",
+  );
 });
 test("a stalled input freezes movement without dropping an explicit shot release", () => {
   const { g, a } = playing(),

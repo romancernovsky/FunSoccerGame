@@ -6,5 +6,5 @@ export function predictionMark(team: Team) {
 
 export function predictionSummary(p: PredictionSummary) {
   const blue = p.total ? Math.round((p.totals.BLUE / p.total) * 100) : 50;
-  return `<section class="crowd-card" aria-label="Bets"><div class="crowd-heading"><strong>${p.total} ${p.total === 1 ? "bet" : "bets"}</strong><span class="crowd-lock">${p.open ? "Open" : p.outcome === "VOID" ? "No result" : p.outcome === "SETTLED" ? `${teamName(p.winner!)} wins` : "Bets locked"}</span></div><div class="crowd-labels"><span>BLUE TEAM <b>${p.total ? blue + "%" : "—"}</b></span><span>ORANGE TEAM <b>${p.total ? 100 - blue + "%" : "—"}</b></span></div><div class="crowd-track ${p.total ? "" : "empty"}" aria-hidden="true"><i style="width:${blue}%"></i></div></section>`;
+  return `<section class="crowd-card" aria-label="Bets"><div class="crowd-heading"><strong>${p.total} ${p.total === 1 ? "bet" : "bets"}</strong><span class="crowd-lock">${p.open ? "Open" : p.outcome === "VOID" ? "No result" : p.outcome === "SETTLED" ? `${teamName(p.winner!)} wins` : "Bets closed"}</span></div><div class="crowd-labels"><span>BLUE TEAM <b>${p.total ? blue + "%" : "—"}</b></span><span>ORANGE TEAM <b>${p.total ? 100 - blue + "%" : "—"}</b></span></div><div class="crowd-track ${p.total ? "" : "empty"}" aria-hidden="true"><i style="width:${blue}%"></i></div></section>`;
 }

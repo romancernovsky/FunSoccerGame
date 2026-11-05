@@ -186,11 +186,32 @@ function scoreboard(player = false) {
   return `<div class="scoreboard${player ? " player-scoreboard" : ""}"><div class="score-team blue"><span>${arrow}</span> BLUE TEAM</div><div class="score"><b id="score-l">${state?.score.BLUE ?? 0}</b><span>:</span><b id="score-w">${state?.score.ORANGE ?? 0}</b></div><div class="score-team orange">ORANGE TEAM <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
 }
 function arena() {
-  const predictions = state?.predictions;
-  const blue = predictions?.total
-    ? Math.round((predictions.totals.BLUE / predictions.total) * 100)
-    : 0;
-  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><div id="balls-remaining" class="balls-remaining" role="status" hidden></div>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>BETS</span><b>${blue}% BLUE TEAM</b><b>${100 - blue}% ORANGE TEAM</b></div>` : ""}</div>`;
+  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><div id="balls-remaining" class="balls-remaining" role="status" hidden></div>${!join ? '<div class="crowd-live" hidden><span>BETS</span><b></b><b></b></div>' : ""}</div>`;
+}
+/** Live audience updates must never replace a held joystick or the broadcast canvas. */
+function updateBets() {
+  if (!state || join) return;
+  const p = state.predictions;
+  const card = document.querySelector<HTMLElement>("#host-bets");
+  if (card) {
+    card.hidden = !p.total;
+    const signature = JSON.stringify(p);
+    if (card.dataset.signature !== signature) {
+      card.innerHTML = predictionSummary(p);
+      card.dataset.signature = signature;
+    }
+  }
+  const live = document.querySelector<HTMLElement>(".crowd-live");
+  if (live) {
+    live.hidden =
+      !p.total || !["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase);
+    const blue = p.total ? Math.round((p.totals.BLUE / p.total) * 100) : 0;
+    const labels = live.querySelectorAll("b");
+    const values = [`${blue}% BLUE TEAM`, `${100 - blue}% ORANGE TEAM`];
+    labels.forEach((label, i) => {
+      if (label.textContent !== values[i]) label.textContent = values[i];
+    });
+  }
 }
 function controls() {
   return `<div class="mobile-controls"><div id="joystick" class="joystick" aria-label="Movement joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash" aria-label="Dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 5 7 7-7 7M3 12h14M17 5l5 7-5 7"/></svg><small>DASH</small></button><button id="shoot" class="shoot" aria-label="Pass or shoot: tap to pass, hold and release to shoot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m12 8 4 3-1.5 4h-5L8 11zM12 4v4M20 10l-4 1M17 19l-2.5-4M7 19l2.5-4M4 10l4 1"/></svg><small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>Turn sideways to follow the action.</p></div>`;
@@ -342,7 +363,7 @@ function watchToolbar() {
 function hostPanel() {
   if (!hostReady)
     return `<section class="pin-panel"><h1>Connecting…</h1><div id="error" role="alert">${esc(error)}</div></section>`;
-  return `<div class="section-top host-console-heading"><div><h1>Host</h1></div></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="rematch_lobby" title="Keep teams and reopen bets; start manually">REMATCH LOBBY</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("BLUE") !== count("ORANGE") ? "⚠ Teams are uneven" : "") : ""}</p><div id="error" role="alert">${esc(error)}</div>${state?.predictions.total ? predictionSummary(state.predictions) : ""}<div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
+  return `<div class="section-top host-console-heading"><div><h1>Host</h1></div></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="rematch_lobby" title="Keep teams and reopen bets; start manually">REMATCH LOBBY</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("BLUE") !== count("ORANGE") ? "⚠ Teams are uneven" : "") : ""}</p><div id="error" role="alert">${esc(error)}</div><div id="host-bets" hidden></div><div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
 }
 function joinPanel() {
   const p = me();
@@ -386,7 +407,6 @@ function render() {
     broadcast,
     playerFullscreen,
     playerOverview,
-    state.predictions,
     followCamera,
   ]);
   if (sig !== signature) {
@@ -409,6 +429,7 @@ function render() {
       });
   }
   warmArena();
+  updateBets();
   const l = document.querySelector("#score-l"),
     w = document.querySelector("#score-w"),
     t = document.querySelector("#clock");

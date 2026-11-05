@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../server/game";
+import type { Phase } from "../src/shared";
 import { Predictions, PredictionError } from "../server/predictions";
 const now = 100000;
 function match() {
@@ -52,20 +53,64 @@ test("one pick per identity, repeat is idempotent, changes replace and malformed
     /new betting round/,
   );
 });
-test("only successful host start locks picks; pause and restart cannot reopen them", () => {
+test("new and changed bets stay open through start, pause, resume and restart", () => {
   const g = match();
   choose(g);
   assert.throws(() => g.command("start", {}, now), /incomplete/);
   assert.equal(summary(g).open, true);
   g.command("start", { confirm: true }, now);
-  assert.equal(summary(g).open, false);
-  assert.throws(() => choose(g, "late"), /locked/);
-  g.command("pause", {}, now + 100);
-  assert.throws(() => choose(g, "late"), /locked/);
-  g.command("resume", {}, now + 200);
-  g.command("restart", { confirm: true }, now + 300);
-  assert.equal(g.predictions.pick("audience"), "BLUE");
-  assert.equal(summary(g).open, false);
+  choose(g, "countdown-viewer", "ORANGE", now + 100);
+  g.tick(0, now + 4000);
+  choose(g, "late-viewer", "BLUE", now + 4100);
+  choose(g, "audience", "ORANGE", now + 4200);
+  g.command("pause", {}, now + 4300);
+  choose(g, "paused-viewer", "BLUE", now + 4400);
+  g.command("resume", {}, now + 4500);
+  g.command("restart", { confirm: true }, now + 4600);
+  assert.equal(g.predictions.pick("audience"), "ORANGE");
+  assert.equal(summary(g).total, 4);
+  assert.equal(summary(g).open, true);
+});
+test("betting is available in every pre-match and active phase, including the three-ball finale and Golden Goal", () => {
+  const p = new Predictions();
+  const phases: Phase[] = [
+    "WAITING",
+    "COUNTDOWN",
+    "PLAYING",
+    "PAUSED",
+    "RULES_COUNTDOWN",
+    "GOAL",
+    "KICKOFF_COUNTDOWN",
+    "GOLDEN_GOAL",
+  ];
+  for (const phase of phases) {
+    assert.equal(p.summary(phase, { BLUE: 0, ORANGE: 0 }, false).open, true);
+    p.choose(`viewer-${phase}`, "BLUE", p.roundId, now, phase);
+  }
+  assert.equal(
+    p.summary("PLAYING", { BLUE: 0, ORANGE: 0 }, false).total,
+    phases.length,
+  );
+});
+test("full time and a host-ended match reject both new and changed bets", () => {
+  for (const ended of [false, true]) {
+    const g = match();
+    choose(g);
+    g.command("start", { confirm: true }, now);
+    g.tick(0, now + 4000);
+    g.score.BLUE = 1;
+    if (ended) g.command("end", { confirm: true }, now + 4100);
+    else {
+      g.remaining = 0.01;
+      g.tick(0.02, now + 4100);
+    }
+    assert.equal(g.phase, "FINISHED");
+    assert.equal(summary(g).open, false);
+    assert.throws(() => choose(g, "late", "ORANGE", now + 4200), /ended/);
+    assert.throws(() => choose(g, "audience", "ORANGE", now + 4200), /ended/);
+    assert.equal(summary(g).total, 1);
+    assert.equal(summary(g).winner, ended ? null : "BLUE");
+  }
 });
 test("final minute keeps team bets unchanged; Golden Goal stays pending until full time", () => {
   const g = match();
@@ -82,8 +127,15 @@ test("final minute keeps team bets unchanged; Golden Goal stays pending until fu
   g.phase = "GOLDEN_GOAL";
   g.golden = true;
   assert.equal(summary(g).outcome, "PENDING");
+  choose(g, "golden-viewer", "BLUE", now + 4900);
   g.goal("BLUE", now + 5000);
   assert.equal(summary(g).outcome, "PENDING");
+  assert.equal(summary(g).open, false);
+  assert.throws(() => choose(g, "after-winner", "BLUE", now + 5100), /ended/);
+  // A host pause during the victory celebration cannot reopen betting.
+  g.command("pause", {}, now + 5200);
+  assert.equal(summary(g).open, false);
+  g.command("resume", {}, now + 5200);
   g.tick(0, now + 8001);
   assert.equal(g.phase, "FINISHED");
   assert.equal(summary(g).winner, "BLUE");
@@ -119,7 +171,7 @@ test("rematch lobby retains players and roles, clears picks and waits for the ho
   assert.equal(summary(g).total, 1);
   assert.throws(() => g.command("rematch_lobby", {}, now), /Finish/);
 });
-test("new match and lobby reset clear picks; quick rematch retains locked team picks", () => {
+test("new match and lobby reset clear picks; quick rematch retains picks and reopens betting", () => {
   const g = match();
   choose(g);
   const original = summary(g).roundId;
@@ -127,7 +179,9 @@ test("new match and lobby reset clear picks; quick rematch retains locked team p
   g.finish();
   g.command("rematch", {}, now + 1);
   assert.equal(g.predictions.pick("audience"), "BLUE");
-  assert.equal(summary(g).open, false);
+  assert.equal(summary(g).open, true);
+  choose(g, "new-rematch-viewer", "ORANGE", now + 1);
+  assert.equal(summary(g).total, 2);
   g.finish();
   g.command("new", {}, now + 2);
   assert.equal(g.players.size, 0);

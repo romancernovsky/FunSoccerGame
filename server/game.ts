@@ -361,7 +361,7 @@ export class Game {
   }
   start(now: number) {
     this.eventTime = now;
-    this.predictions.locked = true;
+    this.predictions.closed = false;
     this.reset();
     this.phase = "COUNTDOWN";
     this.deadline = now + 4000;
@@ -375,6 +375,7 @@ export class Game {
     }
   }
   finish() {
+    this.predictions.closed = true;
     this.phase = "FINISHED";
     this.clearInputs();
     this.emit("match_finished", { score: this.score, ended: this.ended });
@@ -421,6 +422,10 @@ export class Game {
     if (!p) return;
     let fx = p.fx,
       fy = p.fy;
+    if (ball.possessionTeam !== p.team) {
+      ball.possessionTeam = p.team;
+      ball.passes = 0;
+    }
     if (charge < 0.22) {
       let best: Player | undefined,
         dist = 400;
@@ -459,6 +464,7 @@ export class Game {
     if (ball.scored || !["PLAYING", "GOLDEN_GOAL"].includes(this.phase)) return;
     this.eventTime = now;
     this.score[team]++;
+    if (this.golden) this.predictions.closed = true;
     const shooter = ball.lastTouch
       ? this.players.get(ball.lastTouch)
       : undefined;
@@ -742,6 +748,32 @@ export class Game {
     for (let step = 0; step < steps; step++) {
       ball.x += (ball.vx * dt) / steps;
       ball.y += (ball.vy * dt) / steps;
+      // A quick pass is a controllable delivery, not a charged-shot impact.
+      // Only the passer is locked out: nearby teammates can receive immediately.
+      const passer = ball.passFrom
+        ? this.players.get(ball.passFrom)
+        : undefined;
+      if (passer) {
+        const receiver = ps
+          .filter(
+            (p) =>
+              p.connected &&
+              p.id !== passer.id &&
+              p.team === passer.team &&
+              !this.ownedBall(p.id) &&
+              Math.hypot(p.x - ball.x, p.y - ball.y) <
+                (p.keeper && this.inArea(p) ? 54 : 34),
+          )
+          .sort(
+            (a, b) =>
+              Math.hypot(a.x - ball.x, a.y - ball.y) -
+              Math.hypot(b.x - ball.x, b.y - ball.y),
+          )[0];
+        if (receiver) {
+          this.controlBall(ball, receiver, now);
+          return;
+        }
+      }
       if (Math.hypot(ball.vx, ball.vy) > 240 || now < ball.lockUntil) {
         for (const p of ps) {
           if (!p.connected) continue;
@@ -818,33 +850,34 @@ export class Game {
             Math.hypot(a.x - ball.x, a.y - ball.y) -
             Math.hypot(b.x - ball.x, b.y - ball.y),
         )[0];
-      if (near) {
-        const completed =
-          ball.possessionTeam === near.team &&
-          ball.passFrom &&
-          ball.passFrom !== near.id;
-        if (ball.possessionTeam !== near.team) {
-          ball.passes = 0;
-          ball.possessionTeam = near.team;
-        } else if (ball.passFrom && ball.passFrom !== near.id) ball.passes++;
-        ball.passFrom = null;
-        this.sound(
-          near.keeper && this.inArea(near)
-            ? "keeper_catch"
-            : completed
-              ? "pass_completed"
-              : "ball_control",
-          now,
-        );
-        Object.assign(ball, {
-          owner: near.id,
-          lastTouch: near.id,
-          vx: 0,
-          vy: 0,
-          heldAt: now,
-        });
-      }
+      if (near) this.controlBall(ball, near, now);
     }
+  }
+  private controlBall(ball: Ball, player: Player, now: number) {
+    const completed =
+      ball.possessionTeam === player.team &&
+      ball.passFrom &&
+      ball.passFrom !== player.id;
+    if (ball.possessionTeam !== player.team) {
+      ball.passes = 0;
+      ball.possessionTeam = player.team;
+    } else if (ball.passFrom && ball.passFrom !== player.id) ball.passes++;
+    ball.passFrom = null;
+    this.sound(
+      player.keeper && this.inArea(player)
+        ? "keeper_catch"
+        : completed
+          ? "pass_completed"
+          : "ball_control",
+      now,
+    );
+    Object.assign(ball, {
+      owner: player.id,
+      lastTouch: player.id,
+      vx: 0,
+      vy: 0,
+      heldAt: now,
+    });
   }
   private collideBalls() {
     const live = this.balls.filter(

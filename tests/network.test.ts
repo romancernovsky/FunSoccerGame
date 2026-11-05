@@ -170,7 +170,7 @@ test(
         })
       ).json()) as any;
       assert.equal(recovered.pick, "ORANGE");
-      // A failed start leaves predictions open; a successful start locks HTTP writes too.
+      // HTTP bets remain open before and after a successful start, then close at match end.
       assert.match(
         (await request("command", { action: "start", confirm: true }, "error"))
           .message,
@@ -191,7 +191,16 @@ test(
         refreshedHost,
       );
       await request("command", { action: "start", confirm: true }, "state");
-      assert.equal((await pick("BLUE")).status, 409);
+      assert.equal((await pick("BLUE")).status, 200);
+      const live = (await (
+        await fetch("http://127.0.0.1:3102/api/audience", {
+          headers: { cookie },
+        })
+      ).json()) as any;
+      assert.equal(live.pick, "BLUE");
+      assert.equal(live.predictions.open, true);
+      await request("command", { action: "end", confirm: true }, "state");
+      assert.equal((await pick("ORANGE")).status, 409);
       assert.match((await request("nonsense", {}, "error")).message, /Unknown/);
     } finally {
       for (const ws of clients) ws.terminate();

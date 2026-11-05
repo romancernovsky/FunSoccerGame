@@ -18,7 +18,7 @@ export class PredictionError extends Error {
 /** Temporary audience picks. Identity cookies and picks never enter game snapshots. */
 export class Predictions {
   roundId = randomBytes(8).toString("hex");
-  locked = false;
+  closed = false;
   private picks = new Map<
     string,
     { team: Team; windowAt: number; changes: number }
@@ -29,7 +29,7 @@ export class Predictions {
   }
   reset() {
     this.roundId = randomBytes(8).toString("hex");
-    this.locked = false;
+    this.closed = false;
     this.picks.clear();
     this.counts = { BLUE: 0, ORANGE: 0 };
   }
@@ -45,8 +45,8 @@ export class Predictions {
         "A new betting round has opened. Choose again.",
         409,
       );
-    if (this.locked || phase !== "WAITING")
-      throw new PredictionError("Bets are locked.", 409);
+    if (this.closed || phase === "FINISHED")
+      throw new PredictionError("Betting has ended for this match.", 409);
     if (typeof team !== "string" || !TEAMS.includes(team as Team))
       throw new PredictionError("Choose Blue Team or Orange Team.");
     const previous = this.picks.get(token);
@@ -82,7 +82,7 @@ export class Predictions {
         : null;
     return {
       roundId: this.roundId,
-      open: phase === "WAITING" && !this.locked,
+      open: phase !== "FINISHED" && !this.closed,
       totals: { ...this.counts },
       total: this.picks.size,
       outcome: finished ? (winner ? "SETTLED" : "VOID") : "PENDING",
