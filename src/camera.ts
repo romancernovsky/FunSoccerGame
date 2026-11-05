@@ -1,4 +1,4 @@
-import type { Snapshot } from "./shared";
+import type { Snapshot, Ball } from "./shared";
 export type Camera = { x: number; y: number; zoom: number };
 export type Viewport = { width: number; height: number };
 export const CAMERA_ELEVATION = Math.atan2(19, 7.5);
@@ -37,15 +37,47 @@ function bound(view: Camera, viewport: Viewport) {
   };
 }
 
+/** Player phones stay close to their own ball; broadcasts frame all remaining balls. */
+export function cameraFocus(
+  state: Snapshot,
+  localId: string | null = null,
+): Pick<Ball, "x" | "y" | "vx" | "vy"> {
+  const balls = state.balls.filter((b) => !b.scored);
+  if (balls.length <= 1) return balls[0] ?? state.ball;
+  const player = state.players.find((p) => p.id === localId);
+  if (player)
+    return (
+      balls.find((b) => b.owner === localId) ??
+      balls.reduce((a, b) =>
+        Math.hypot(a.x - player.x, a.y - player.y) <=
+        Math.hypot(b.x - player.x, b.y - player.y)
+          ? a
+          : b,
+      )
+    );
+  return {
+    x:
+      (Math.min(...balls.map((b) => b.x)) +
+        Math.max(...balls.map((b) => b.x))) /
+      2,
+    y:
+      (Math.min(...balls.map((b) => b.y)) +
+        Math.max(...balls.map((b) => b.y))) /
+      2,
+    vx: 0,
+    vy: 0,
+  };
+}
 /** A close, fixed-orientation camera shared by players, host and projector. */
 export function cameraTarget(
   state: Snapshot,
   follow: boolean,
   viewport: Viewport = reference,
+  localId: string | null = null,
 ): Camera {
-  if (!follow || ["WAITING", "REORG", "FINISHED"].includes(state.phase))
+  if (!follow || ["WAITING", "FINISHED"].includes(state.phase))
     return overview();
-  const ball = state.ball;
+  const ball = cameraFocus(state, localId);
   const nearby = state.players.filter(
     (p) => p.connected && Math.hypot(p.x - ball.x, p.y - ball.y) < 300,
   );
@@ -54,12 +86,25 @@ export function cameraTarget(
     ...nearby.map((p) => Math.hypot(p.x - ball.x, p.y - ball.y)),
   );
   const speed = Math.hypot(ball.vx, ball.vy);
-  const actionWidth = clamp(750 + spread * 0.18 + speed * 0.1, 750, 900);
+  let actionWidth = clamp(750 + spread * 0.18 + speed * 0.1, 750, 900);
+  const balls = state.balls.filter((b) => !b.scored);
+  if (!localId && balls.length > 1) {
+    const xSpan =
+      Math.max(...balls.map((b) => b.x)) - Math.min(...balls.map((b) => b.x));
+    const ySpan =
+      Math.max(...balls.map((b) => b.y)) - Math.min(...balls.map((b) => b.y));
+    const aspect = viewport.width / Math.max(1, viewport.height);
+    actionWidth = Math.max(
+      actionWidth,
+      xSpan + 180,
+      (ySpan + 160) * Math.sin(CAMERA_ELEVATION) * aspect,
+    );
+  }
   // Fit the action's width, not the whole pitch or a fixed screen-height zoom.
   // This is especially important on a very wide, short Safari viewport.
   const zoom = clamp(
     (cameraFrustum(viewport).halfWidth * 2) / actionWidth,
-    1.6,
+    !localId && balls.length > 1 ? 1 : 1.6,
     4.8,
   );
   return bound(

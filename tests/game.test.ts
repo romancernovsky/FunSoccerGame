@@ -5,8 +5,8 @@ const now = 100000;
 const game = () =>
   new Game({ duration: 180, maxTeamSize: 6, grace: 20, dev: true });
 function pair(g = game()) {
-  const a = g.join("Alex", "LEADERS", now),
-    b = g.join("Sam", "WORKERS", now);
+  const a = g.join("Alex", "BLUE", now),
+    b = g.join("Sam", "ORANGE", now);
   return { g, a, b };
 }
 function playing() {
@@ -18,26 +18,26 @@ function playing() {
 test("validates names, duplicate normalization, team and maximum size", () => {
   const g = game();
   for (const n of ["", "   ", "<script>", "a".repeat(13)])
-    assert.throws(() => g.join(n, "LEADERS", now));
-  g.join("Alex", "LEADERS", now);
-  assert.throws(() => g.join(" alex ", "WORKERS", now), /taken/);
+    assert.throws(() => g.join(n, "BLUE", now));
+  g.join("Alex", "BLUE", now);
+  assert.throws(() => g.join(" alex ", "ORANGE", now), /taken/);
   assert.throws(() => g.join("OK", "OTHER", now));
-  for (let i = 0; i < 5; i++) g.join(`Player ${i}`, "LEADERS", now);
-  assert.throws(() => g.join("Seventh", "LEADERS", now), /full/);
+  for (let i = 0; i < 5; i++) g.join(`Player ${i}`, "BLUE", now);
+  assert.throws(() => g.join("Seventh", "BLUE", now), /full/);
   assert.equal(g.phase, "WAITING");
 });
 test("empty side blocks start even with override", () => {
   const g = game();
-  g.join("Alex", "LEADERS", now);
+  g.join("Alex", "BLUE", now);
   assert.throws(() => g.command("start", { confirm: true }, now), /Both teams/);
 });
 test("incomplete and uneven teams require explicit override", () => {
   const { g } = pair();
-  g.join("Lee", "LEADERS", now);
+  g.join("Lee", "BLUE", now);
   assert.throws(() => g.command("start", {}, now), /incomplete/);
   g.command("start", { confirm: true }, now);
   assert.equal(g.phase, "COUNTDOWN");
-  assert.throws(() => g.join("Late", "WORKERS", now), /PROGRESS/);
+  assert.throws(() => g.join("Late", "ORANGE", now), /PROGRESS/);
 });
 test("full teams start without confirmation and never auto-start", () => {
   const g = game();
@@ -49,7 +49,7 @@ test("full teams start without confirmation and never auto-start", () => {
 });
 test("goalkeeper is optional, unique per team, transferable and toggleable", () => {
   const { g, a } = pair();
-  const c = g.join("Lee", "LEADERS", now);
+  const c = g.join("Lee", "BLUE", now);
   g.command("keeper", { id: a.id }, now);
   g.command("keeper", { id: c.id }, now);
   assert.equal(g.players.get(a.id)!.keeper, false);
@@ -61,7 +61,7 @@ test("goalkeeper is optional, unique per team, transferable and toggleable", () 
 });
 test("team movement cannot exceed capacity", () => {
   const { g, a } = pair();
-  for (let i = 0; i < 5; i++) g.join(`W${i}`, "WORKERS", now);
+  for (let i = 0; i < 5; i++) g.join(`W${i}`, "ORANGE", now);
   assert.throws(() => g.command("move", { id: a.id }, now), /full/);
 });
 test("server countdown, timer and pause freeze simulation", () => {
@@ -82,10 +82,10 @@ test("goals require entire ball to cross within opening; celebration freezes clo
   const { g } = playing();
   Object.assign(g.ball, { x: 1208, y: 350, vx: 0 });
   g.tick(0.01, now + 4100);
-  assert.equal(g.score.LEADERS, 0);
+  assert.equal(g.score.BLUE, 0);
   g.ball.x = 1210;
   g.tick(0.01, now + 4200);
-  assert.equal(g.score.LEADERS, 1);
+  assert.equal(g.score.BLUE, 1);
   assert.equal(g.phase, "GOAL");
   const remaining = g.remaining;
   g.tick(1, now + 5000);
@@ -100,7 +100,7 @@ test("ball bounces outside goal mouth", () => {
   const { g } = playing();
   Object.assign(g.ball, { x: 1198, y: 100, vx: 200 });
   g.tick(0.1, now + 4100);
-  assert.equal(g.score.LEADERS, 0);
+  assert.equal(g.score.BLUE, 0);
   assert.ok(g.ball.vx < 0);
 });
 test("tie becomes Golden Goal and next goal finishes", () => {
@@ -111,13 +111,13 @@ test("tie becomes Golden Goal and next goal finishes", () => {
   Object.assign(g.ball, { x: -10, y: 350, vx: 0 });
   g.tick(0.01, now + 4200);
   assert.equal(g.phase, "GOAL");
-  assert.equal(g.score.WORKERS, 1);
+  assert.equal(g.score.ORANGE, 1);
   g.tick(0, now + 7200);
   assert.equal(g.phase, "FINISHED");
 });
 test("non-tie finishes at regulation time", () => {
   const { g } = playing();
-  g.score.LEADERS = 1;
+  g.score.BLUE = 1;
   g.remaining = 0.01;
   g.tick(0.02, now + 4100);
   assert.equal(g.phase, "FINISHED");
@@ -146,12 +146,12 @@ test("rematch keeps names and roles, new match clears them", () => {
   const { g, a } = pair();
   g.command("keeper", { id: a.id }, now);
   g.command("start", { confirm: true }, now);
-  g.score.LEADERS = 3;
+  g.score.BLUE = 3;
   g.command("end", { confirm: true }, now);
   g.command("rematch", {}, now);
   assert.equal(g.players.size, 2);
   assert.equal(g.players.get(a.id)!.keeper, true);
-  assert.equal(g.score.LEADERS, 0);
+  assert.equal(g.score.BLUE, 0);
   assert.equal(g.remaining, 180);
   g.command("end", { confirm: true }, now);
   g.command("new", {}, now);
@@ -167,14 +167,14 @@ test("invalid inputs cannot move players or manufacture charge", () => {
 });
 test("three real teammate passes qualify for Team Goal", () => {
   const { g, a } = pair();
-  const c = g.join("Lee", "LEADERS", now);
+  const c = g.join("Lee", "BLUE", now);
   g.command("start", { confirm: true }, now);
   g.tick(0, now + 4000);
   const p = g.players.get(a.id)!,
     q = g.players.get(c.id)!;
   Object.assign(p, { x: 300, y: 350, fx: 1, fy: 0 });
   Object.assign(q, { x: 500, y: 350, fx: -1, fy: 0 });
-  g.possessionTeam = "LEADERS";
+  g.possessionTeam = "BLUE";
   g.ball.owner = p.id;
   let time = now + 4100;
   for (let i = 0; i < 3; i++) {
@@ -250,7 +250,7 @@ test("contact gives a brief pickup grace then transfers possession without wall 
     x: 529,
     y: 350,
   });
-  g.possessionTeam = "LEADERS";
+  g.possessionTeam = "BLUE";
   g.passes = 3;
   g.tick(0.01, now + 4200);
   assert.equal(g.ball.owner, a.id);
@@ -265,7 +265,7 @@ test("test players keep support lanes and can produce real goals", () => {
   g.command("bots", {}, now);
   g.command("start", {}, now);
   for (let i = 0; i < 1800; i++) g.tick(1 / 30, now + 4000 + (i * 1000) / 30);
-  assert.ok(g.score.LEADERS + g.score.WORKERS > 0);
+  assert.ok(g.score.BLUE + g.score.ORANGE > 0);
   const ys = [...g.players.values()].map((p) => p.y);
   assert.ok(Math.max(...ys) - Math.min(...ys) > 200);
 });

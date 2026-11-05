@@ -1,5 +1,5 @@
 {
-  "name": "leaders-vs-workers",
+  "name": "office-arena",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "test:browser": "playwright test",
     "test:load": "tsx scripts/load.ts",
     "format": "prettier --write src server tests scripts *.ts *.json index.html README.md",
-    "test:reorg": "playwright test --config=playwright.reorg.config.ts"
+    "test:final-minute": "playwright test --config=playwright.final-minute.config.ts"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",

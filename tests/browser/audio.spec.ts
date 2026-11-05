@@ -122,8 +122,8 @@ test("host start unlocks sound, background broadcast stays audible, pauses are q
     // Two idle real clients keep the ball untouched, so ongoing audio must be
     // stadium ambience rather than a bot's incidental pass/shot.
     for (const [name, team] of [
-      ["Avery", "LEADERS"],
-      ["Morgan", "WORKERS"],
+      ["Avery", "BLUE"],
+      ["Morgan", "ORANGE"],
     ]) {
       const ws = new WebSocket("ws://127.0.0.1:3100/ws");
       players.push(ws);
@@ -378,9 +378,9 @@ test("every recorded cue produces finite audio without clipping", async ({
       "match_resumed",
       "goal_scored",
       "team_goal",
-      "reorg_started",
-      "reorg_kickoff",
       "final_minute",
+      "balls_dropped",
+      "ball_landed",
       "last_seconds",
       "golden_goal_started",
       "match_finished",
@@ -418,8 +418,8 @@ test("recorded cues preserve action batches, skip stale history and sound every 
 }) => {
   await probe(page);
   const g = new Game({ duration: 66, maxTeamSize: 6, grace: 20, dev: false });
-  const a = g.join("Alex", "LEADERS", 1000);
-  g.join("Sam", "WORKERS", 1000);
+  const a = g.join("Alex", "BLUE", 1000);
+  g.join("Sam", "ORANGE", 1000);
   const initial = structuredClone(g.snapshot(1000));
   const frames: Snapshot[] = [];
   const capture = (now: number) =>
@@ -436,41 +436,45 @@ test("recorded cues preserve action batches, skip stale history and sound every 
   capture(5300);
   g.command("resume", {}, 5400);
   capture(5400);
+  Object.assign(g.ball, { x: 600, y: 350, vx: 0, vy: 0, owner: null });
   g.tick(6, 11400);
   capture(11400);
-  expect(g.snapshot(11400).phase).toBe("REORG");
-  g.command("pause", {}, 11500);
-  capture(11500);
-  g.command("resume", {}, 11600);
-  capture(11600);
-  let now = g.deadline;
-  g.tick(0, now);
-  capture(now);
-  now = g.deadline;
-  g.tick(0, now);
-  capture(now);
-  now += 34;
-  g.tick(1 / 30, now);
-  capture(now);
-  now += 100;
-  g.possessionTeam = "LEADERS";
+  expect(g.snapshot(11400).phase).toBe("RULES_COUNTDOWN");
+  let now = 11400;
+  for (let second = 0; second < 7; second++) {
+    now += 1000;
+    g.tick(0, now);
+    capture(now);
+  }
+  expect(g.phase).toBe("PLAYING");
+  expect(g.balls.length).toBe(3);
+  for (let i = 0; i < 45; i++) {
+    now += 1000 / 30;
+    g.tick(1 / 30, now);
+    capture(now);
+  }
+  g.possessionTeam = "BLUE";
   g.passes = 3;
-  g.goal("LEADERS", now);
-  capture(now);
+  for (const ball of g.balls) {
+    now += 100;
+    g.goal("BLUE", now, ball);
+    capture(now);
+  }
+  expect(g.phase).toBe("GOAL");
   now = g.deadline;
   g.tick(0, now);
   capture(now);
   now = g.deadline;
   g.tick(0, now);
   capture(now);
-  g.score.WORKERS = 1;
+  g.score.ORANGE = g.score.BLUE;
   g.remaining = 0.01;
   now += 34;
   g.tick(0.02, now);
   capture(now);
   expect(g.snapshot(now).phase).toBe("GOLDEN_GOAL");
   now += 100;
-  g.goal("WORKERS", now);
+  g.goal("ORANGE", now);
   capture(now);
   now = g.deadline;
   g.tick(0, now);
@@ -561,9 +565,9 @@ test("recorded cues preserve action batches, skip stale history and sound every 
     "pass",
     "match_paused",
     "match_resumed",
-    "reorg_started",
-    "reorg_kickoff",
     "final_minute",
+    "balls_dropped",
+    "ball_landed",
     "goal_scored",
     "team_goal",
     "golden_goal_started",

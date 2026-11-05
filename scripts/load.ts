@@ -40,7 +40,7 @@ try {
       ws.send(
         JSON.stringify({
           type: "join",
-          data: { name: `Load ${i}`, team: i < 6 ? "LEADERS" : "WORKERS" },
+          data: { name: `Load ${i}`, team: i < 6 ? "BLUE" : "ORANGE" },
         }),
       );
       ids.push((await response).id);

@@ -52,7 +52,7 @@ try {
   rival = new WebSocket("ws://127.0.0.1:3106/ws");
   await new Promise((r) => rival.once("open", r));
   rival.send(
-    JSON.stringify({ type: "join", data: { name: "Alex", team: "WORKERS" } }),
+    JSON.stringify({ type: "join", data: { name: "Alex", team: "ORANGE" } }),
   );
   await host.locator('[data-command="start"]').waitFor({ state: "visible" });
   await host.waitForTimeout(300);

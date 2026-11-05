@@ -4,8 +4,8 @@ import { Game } from "../server/game";
 
 function setup() {
   const g = new Game();
-  const a = g.join("Alex", "LEADERS", 1000);
-  g.join("Sam", "WORKERS", 1000);
+  const a = g.join("Alex", "BLUE", 1000);
+  g.join("Sam", "ORANGE", 1000);
   g.command("start", { confirm: true }, 1000);
   g.tick(0, 5000);
   return { g, a };
@@ -40,7 +40,7 @@ test("cue history is bounded, expires and is omitted from player snapshots", () 
 test("a successful steal emits a tackle cue, kickoff reset does not", () => {
   const { g, a } = setup();
   const p = g.players.get(a.id)!;
-  const q = [...g.players.values()].find((p) => p.team === "WORKERS")!;
+  const q = [...g.players.values()].find((p) => p.team === "ORANGE")!;
   Object.assign(p, { x: 500, y: 350 });
   Object.assign(q, { x: 544, y: 350 });
   Object.assign(g.ball, {
@@ -53,7 +53,7 @@ test("a successful steal emits a tackle cue, kickoff reset does not", () => {
   g.tick(1 / 30, 5600);
   assert.equal(g.ball.owner, q.id);
   assert.ok(g.snapshot(5600).events!.some((e) => e.kind === "tackle"));
-  g.goal("LEADERS", 6000);
+  g.goal("BLUE", 6000);
   g.tick(0, 9000);
   assert.ok(!g.snapshot(9000).events!.some((e) => e.kind === "tackle"));
 });

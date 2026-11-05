@@ -110,7 +110,7 @@ try {
     admin.send(
       JSON.stringify({
         type: "join",
-        data: { name: "TEST Rival", team: "WORKERS" },
+        data: { name: "TEST Rival", team: "ORANGE" },
       }),
     );
     await wait(() => state.players.length === 2);

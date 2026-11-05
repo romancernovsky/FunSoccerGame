@@ -4,7 +4,6 @@ import { publicHeader } from "./public-header";
 import { displayCapabilities, showDisplayHelp } from "./display-mode";
 import { startAudience } from "./audience";
 import { predictionSummary } from "./prediction-view";
-import { reorgView } from "./reorg-view";
 import "@fontsource/barlow-condensed/latin-600.css";
 import "@fontsource/barlow-condensed/latin-700.css";
 import "@fontsource/barlow-condensed/latin-800.css";
@@ -17,6 +16,7 @@ import { Arena3D } from "./renderer3d";
 import { drawCelebration } from "./visuals";
 import {
   cameraTarget,
+  cameraFocus,
   visibleHalfExtents,
   type Viewport,
   smoothCamera,
@@ -27,8 +27,9 @@ import QRCode from "qrcode";
 import {
   DEFAULT_MATCH_DURATION_SECONDS,
   FIELD as F,
-  REORG,
   TEAMS,
+  teamName,
+  teamClass,
   type Snapshot,
   type Team,
   type Input,
@@ -37,6 +38,7 @@ import {
 import "./style.css";
 import "./mobile-game.css";
 import "./mobile-pages.css";
+import "./multiball.css";
 const arrow =
   '<svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -51,7 +53,7 @@ let state: Snapshot | null = null,
   hostReady = false,
   identity: string | null = null,
   token = localStorage.getItem("lvw-session"),
-  selected: Team = "LEADERS",
+  selected: Team = "BLUE",
   signature = "",
   error = "",
   notice = "",
@@ -171,24 +173,24 @@ function connect() {
 function header() {
   if (join && me()) return "";
   if (!host) return publicHeader(join ? "play" : null, connected);
-  return `<header class="host-header" data-connected="${connected}"><a class="brand" href="/host">LEADERS <span>vs</span> WORKERS <small>HOST</small></a>${!connected ? '<span role="status">Reconnecting…</span>' : ""}</header>`;
+  return `<header class="host-header" data-connected="${connected}"><a class="brand" href="/host">BLUE TEAM <span>vs</span> ORANGE TEAM <small>HOST</small></a>${!connected ? '<span role="status">Reconnecting…</span>' : ""}</header>`;
 }
 function teamCard(team: Team, manage = false) {
   const ps = state?.players.filter((p) => p.team === team) ?? [];
-  return `<section class="team-card ${team.toLowerCase()}" aria-label="${team} roster"><div class="team-title"><h2>${team}</h2><span class="capacity">${ps.length}<small> / ${state?.maxTeamSize ?? 6}</small></span></div><div class="roster">${ps.map((p) => `<div class="roster-row"><span class="avatar">${esc(p.name.slice(0, 2).toUpperCase())}</span><span class="player-label">${esc(p.name)} ${p.keeper ? "🧤" : ""}<small>${p.bot ? "TEST PLAYER · " : ""}${p.connected ? "Connected" : Date.now() + serverOffset - p.disconnectedAt < 10000 ? "Reconnecting" : "Disconnected"}</small></span>${manage && state?.phase === "WAITING" ? `<div class="player-actions"><button title="${p.keeper ? "Remove" : "Assign"} goalkeeper" data-player="${p.id}" data-action="keeper">🧤</button><button title="Move team" data-player="${p.id}" data-action="move">⇄</button><button title="Remove player" data-player="${p.id}" data-action="remove">×</button></div>` : `<span class="player-dot ${p.connected ? "" : "away"}"></span>`}</div>`).join("")}${!ps.length ? '<div class="roster-empty-message">No players yet</div>' : ""}</div></section>`;
+  return `<section class="team-card ${teamClass(team)}" aria-label="${teamName(team)} roster"><div class="team-title"><h2>${teamName(team)}</h2><span class="capacity">${ps.length}<small> / ${state?.maxTeamSize ?? 6}</small></span></div><div class="roster">${ps.map((p) => `<div class="roster-row"><span class="avatar">${esc(p.name.slice(0, 2).toUpperCase())}</span><span class="player-label">${esc(p.name)} ${p.keeper ? "🧤" : ""}<small>${p.bot ? "TEST PLAYER · " : ""}${p.connected ? "Connected" : Date.now() + serverOffset - p.disconnectedAt < 10000 ? "Reconnecting" : "Disconnected"}</small></span>${manage && state?.phase === "WAITING" ? `<div class="player-actions"><button title="${p.keeper ? "Remove" : "Assign"} goalkeeper" data-player="${p.id}" data-action="keeper">🧤</button><button title="Move team" data-player="${p.id}" data-action="move">⇄</button><button title="Remove player" data-player="${p.id}" data-action="remove">×</button></div>` : `<span class="player-dot ${p.connected ? "" : "away"}"></span>`}</div>`).join("")}${!ps.length ? '<div class="roster-empty-message">No players yet</div>' : ""}</div></section>`;
 }
 function qrCard() {
   return `<div class="join-card"><h2>Scan to join</h2><div class="qr-wrap"><canvas id="qr"></canvas></div><a class="primary phone-join" href="/join">Play</a><a class="join-link" href="/join">${esc(location.host)}/join</a></div>`;
 }
 function scoreboard(player = false) {
-  return `<div class="scoreboard${player ? " player-scoreboard" : ""}"><div class="score-team blue"><span>${arrow}</span> LEADERS</div><div class="score"><b id="score-l">${state?.score.LEADERS ?? 0}</b><span>:</span><b id="score-w">${state?.score.WORKERS ?? 0}</b></div><div class="score-team orange">WORKERS <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
+  return `<div class="scoreboard${player ? " player-scoreboard" : ""}"><div class="score-team blue"><span>${arrow}</span> BLUE TEAM</div><div class="score"><b id="score-l">${state?.score.BLUE ?? 0}</b><span>:</span><b id="score-w">${state?.score.ORANGE ?? 0}</b></div><div class="score-team orange">ORANGE TEAM <span>✳</span></div><div class="clock-wrap"><small id="clock-label">${state?.golden ? "NEXT GOAL WINS" : active() ? "MATCH TIME" : "MATCH DURATION"}</small><strong id="clock">${clock()}</strong></div></div>`;
 }
 function arena() {
   const predictions = state?.predictions;
-  const leaders = predictions?.total
-    ? Math.round((predictions.totals.LEADERS / predictions.total) * 100)
+  const blue = predictions?.total
+    ? Math.round((predictions.totals.BLUE / predictions.total) * 100)
     : 0;
-  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>BETS</span><b>${leaders}% LEADERS</b><b>${100 - leaders}% WORKERS</b></div>` : ""}</div>`;
+  return `<div class="arena-wrap"><canvas id="arena" aria-label="Live 3D football arena"></canvas><canvas id="arena-fx" aria-hidden="true"></canvas><div id="arena-overlay" class="arena-overlay"></div><div id="balls-remaining" class="balls-remaining" role="status" hidden></div>${!join && state?.predictions.total && ["WAITING", "PLAYING", "GOLDEN_GOAL"].includes(state.phase) ? `<div class="crowd-live"><span>BETS</span><b>${blue}% BLUE TEAM</b><b>${100 - blue}% ORANGE TEAM</b></div>` : ""}</div>`;
 }
 function controls() {
   return `<div class="mobile-controls"><div id="joystick" class="joystick" aria-label="Movement joystick"><span id="stick"></span><small>MOVE</small></div><div class="action-controls"><button id="dash" class="dash" aria-label="Dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 5 7 7-7 7M3 12h14M17 5l5 7-5 7"/></svg><small>DASH</small></button><button id="shoot" class="shoot" aria-label="Pass or shoot: tap to pass, hold and release to shoot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m12 8 4 3-1.5 4h-5L8 11zM12 4v4M20 10l-4 1M17 19l-2.5-4M7 19l2.5-4M4 10l4 1"/></svg><small>PASS / SHOOT</small><span id="charge-bar"></span></button></div></div><div class="rotate"><span>↻</span><h2>Rotate your phone to play</h2><p>Turn sideways to follow the action.</p></div>`;
@@ -282,8 +284,8 @@ function playerToolbar() {
         ? "Play without Safari bars"
         : "Fullscreen options"
       : `${playerFullscreen ? "Exit" : "Enter"} full screen`;
-  const attackRight = me()?.team !== "WORKERS";
-  return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow the ball" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "BALL" : "FIELD"}</span></button><span class="attack-direction ${me()?.team.toLowerCase() ?? ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
+  const attackRight = me()?.team !== "ORANGE";
+  return `<div class="player-view-tools"><button id="player-camera" class="secondary compact" aria-label="${playerOverview ? "Follow the ball" : "Show full field"}" aria-pressed="${playerOverview}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><circle cx="12" cy="12" r="3"/></svg><span>${playerOverview ? "BALL" : "FIELD"}</span></button><span class="attack-direction ${me() ? teamClass(me()!.team) : ""}" aria-label="Attack ${attackRight ? "right" : "left"}">${attackRight ? "ATTACK →" : "← ATTACK"}</span></div><div class="player-toolbar"><button class="secondary compact" id="player-fullscreen" aria-label="${label}" aria-pressed="${playerFullscreen}" ${capabilities.standalone ? "disabled" : ""}><b aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${playerFullscreen ? "M3 8h5V3M16 3v5h5M3 16h5v5M16 21v-5h5" : "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"}"/></svg></b><span>${capabilities.standalone ? "App view" : help ? "Screen options" : playerFullscreen ? "Exit full screen" : "Full screen"}</span></button></div>`;
 }
 function audioLabel() {
   return {
@@ -340,15 +342,15 @@ function watchToolbar() {
 function hostPanel() {
   if (!hostReady)
     return `<section class="pin-panel"><h1>Connecting…</h1><div id="error" role="alert">${esc(error)}</div></section>`;
-  return `<div class="section-top host-console-heading"><div><h1>Host</h1></div></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="rematch_lobby" title="Keep teams and reopen bets; start manually">REMATCH LOBBY</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("LEADERS") !== count("WORKERS") ? "⚠ Teams are uneven" : "") : ""}</p><div id="error" role="alert">${esc(error)}</div>${state?.predictions.total ? predictionSummary(state.predictions) : ""}<div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
+  return `<div class="section-top host-console-heading"><div><h1>Host</h1></div></div>${active() ? `<section id="host-watch" class="host-watch">${watchToolbar()}${scoreboard()}${arena()}${!connected ? '<div class="watch-disconnected">Reconnecting to the live match…</div>' : ""}</section>` : scoreboard()}<div class="host-actions">${state?.phase === "WAITING" ? `<button class="primary" data-command="start" ${TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "disabled" : ""}>▶ START MATCH</button>${state?.dev ? '<button class="secondary" data-command="bots">＋ Fill with Test Players</button>' : ""}<button class="secondary" data-command="reset">Reset lobby</button>` : state?.phase === "FINISHED" ? '<button class="primary" data-command="rematch">↻ REMATCH</button><button class="secondary" data-command="rematch_lobby" title="Keep teams and reopen bets; start manually">REMATCH LOBBY</button><button class="secondary" data-command="new">NEW MATCH</button>' : `<button class="primary" data-command="${state?.phase === "PAUSED" ? "resume" : "pause"}">${state?.phase === "PAUSED" ? "▶ RESUME" : "Ⅱ PAUSE"}</button><button class="secondary" data-command="restart">↻ RESTART MATCH</button><button class="danger" data-command="end">END MATCH</button>`}</div><p class="host-warning">${state?.phase === "WAITING" ? (TEAMS.some((t) => !state?.players.some((p) => p.team === t && p.connected)) ? "Both teams need at least one connected player." : count("BLUE") !== count("ORANGE") ? "⚠ Teams are uneven" : "") : ""}</p><div id="error" role="alert">${esc(error)}</div>${state?.predictions.total ? predictionSummary(state.predictions) : ""}<div class="teams-grid">${TEAMS.map((t) => teamCard(t, true)).join("")}</div>`;
 }
 function joinPanel() {
   const p = me();
   if (p) {
     if (active())
-      return `<div class="player-game">${playerToolbar()}${scoreboard(true)}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${p.team.toLowerCase()}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
+      return `<div class="player-game">${playerToolbar()}${scoreboard(true)}${arena()}${controls()}${!connected ? '<div class="network-banner">Reconnecting… Your place is reserved.</div>' : ""}<div class="player-help"><span class="you-chip ${teamClass(p.team)}">● YOU: ${esc(p.name)} ${p.keeper ? "🧤" : ""}</span><span>WASD / ARROWS <i>Move</i> &nbsp; SPACE <i>Tap to pass · Hold to shoot</i> &nbsp; SHIFT <i>Dash</i></span></div></div>`;
     const teammates = state!.players.filter((q) => q.team === p.team);
-    return `<section class="waiting-layout simple-panel"><h1>You’re in</h1><p class="joined-identity"><strong>${esc(p.name)}</strong><span class="${p.team.toLowerCase()}">${p.team}${p.keeper ? " 🧤" : ""}</span></p><div class="waiting-pill" role="status"><i></i>Waiting for host…</div><div class="waiting-team"><h2>Your team <span>${teammates.length} / ${state!.maxTeamSize}</span></h2><ul>${teammates.map((q) => `<li>${esc(q.name)}${q.keeper ? " 🧤" : ""}${!q.connected ? "<small>Reconnecting…</small>" : ""}</li>`).join("")}</ul></div></section>`;
+    return `<section class="waiting-layout simple-panel"><h1>You’re in</h1><p class="joined-identity"><strong>${esc(p.name)}</strong><span class="${teamClass(p.team)}">${teamName(p.team)}${p.keeper ? " 🧤" : ""}</span></p><div class="waiting-pill" role="status"><i></i>Waiting for host…</div><div class="waiting-team"><h2>Your team <span>${teammates.length} / ${state!.maxTeamSize}</span></h2><ul>${teammates.map((q) => `<li>${esc(q.name)}${q.keeper ? " 🧤" : ""}${!q.connected ? "<small>Reconnecting…</small>" : ""}</li>`).join("")}</ul></div></section>`;
   }
   if (active())
     return `<section class="simple-panel join-unavailable"><h1>Match in progress</h1><p>Next game soon.</p><a class="secondary" href="/bet">Bet</a></section>`;
@@ -358,12 +360,12 @@ function joinPanel() {
     if (available) selected = available;
   }
   const full = TEAMS.every((t) => count(t) >= capacity);
-  return `<section class="join-layout simple-panel"><h1>Play</h1><form id="join-form"><label for="name">Your name</label><input id="name" name="name" autocomplete="nickname" autocapitalize="words" maxlength="12" placeholder="Name" required><fieldset><legend>Team</legend><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${t.toLowerCase()} ${selected === t ? "selected" : ""}" data-team="${t}" aria-pressed="${selected === t}" ${count(t) >= capacity ? "disabled" : ""}><strong>${t}</strong><small>${count(t)} / ${capacity}${count(t) >= capacity ? " · Full" : ""}</small></button>`).join("")}</div></fieldset><div id="error" role="alert">${esc(error)}</div><button class="primary" type="submit" ${!connected || full ? "disabled" : ""}>Play</button>${full ? '<p class="join-full" role="status">Teams full. <a href="/bet">Bet on the winner</a></p>' : ""}</form></section>`;
+  return `<section class="join-layout simple-panel"><h1>Play</h1><form id="join-form"><label for="name">Your name</label><input id="name" name="name" autocomplete="nickname" autocapitalize="words" maxlength="12" placeholder="Name" required><fieldset><legend>Team</legend><div class="team-options">${TEAMS.map((t) => `<button type="button" class="team-option ${teamClass(t)} ${selected === t ? "selected" : ""}" data-team="${t}" aria-pressed="${selected === t}" ${count(t) >= capacity ? "disabled" : ""}><strong>${teamName(t)}</strong><small>${count(t)} / ${capacity}${count(t) >= capacity ? " · Full" : ""}</small></button>`).join("")}</div></fieldset><div id="error" role="alert">${esc(error)}</div><button class="primary" type="submit" ${!connected || full ? "disabled" : ""}>Play</button>${full ? '<p class="join-full" role="status">Teams full. <a href="/bet">Bet on the winner</a></p>' : ""}</form></section>`;
 }
 function spectator() {
   if (active())
     return `<div class="match-heading"><span class="eyebrow">${state?.golden ? "GOLDEN GOAL" : "LIVE"}</span><div class="spectator-view-tools"><button class="secondary compact" id="camera-mode" aria-pressed="${followCamera}" aria-label="${followCamera ? "Show full field" : "Follow the ball"}">${followCamera ? "Ball camera" : "Full field"}</button><button class="secondary compact" id="fullscreen">Full screen</button></div></div>${scoreboard()}${arena()}`;
-  return `<div class="section-top"><h1>LEADERS <span class="accent">vs</span> WORKERS</h1><div class="lobby-status"><strong>${count("LEADERS") + count("WORKERS")} / ${(state?.maxTeamSize ?? 6) * 2}</strong><small>Waiting for host</small></div></div><div class="lobby-layout"><div class="lobby-main"><div class="teams-grid">${TEAMS.map((t) => teamCard(t)).join("")}</div></div>${qrCard()}</div>`;
+  return `<div class="section-top"><h1>BLUE TEAM <span class="accent">vs</span> ORANGE TEAM</h1><div class="lobby-status"><strong>${count("BLUE") + count("ORANGE")} / ${(state?.maxTeamSize ?? 6) * 2}</strong><small>Waiting for host</small></div></div><div class="lobby-layout"><div class="lobby-main"><div class="teams-grid">${TEAMS.map((t) => teamCard(t)).join("")}</div></div>${qrCard()}</div>`;
 }
 function render() {
   if (!state) return;
@@ -410,8 +412,8 @@ function render() {
   const l = document.querySelector("#score-l"),
     w = document.querySelector("#score-w"),
     t = document.querySelector("#clock");
-  if (l) l.textContent = String(state.score.LEADERS);
-  if (w) w.textContent = String(state.score.WORKERS);
+  if (l) l.textContent = String(state.score.BLUE);
+  if (w) w.textContent = String(state.score.ORANGE);
   if (t) {
     t.textContent = clock();
     t.classList.toggle(
@@ -431,7 +433,7 @@ function confirmCommand(action: string) {
     body = "";
   if (action === "start" && TEAMS.some((t) => count(t) < state!.maxTeamSize)) {
     title = "Teams are incomplete";
-    body = `LEADERS: ${count("LEADERS")} / ${state!.maxTeamSize} · WORKERS: ${count("WORKERS")} / ${state!.maxTeamSize}. ${count("LEADERS") !== count("WORKERS") ? "Teams are uneven. " : ""}Start anyway?`;
+    body = `Blue Team: ${count("BLUE")} / ${state!.maxTeamSize} · Orange Team: ${count("ORANGE")} / ${state!.maxTeamSize}. ${count("BLUE") !== count("ORANGE") ? "Teams are uneven. " : ""}Start anyway?`;
   } else if (["restart", "end", "new", "reset"].includes(action)) {
     title = {
       restart: "Restart this match?",
@@ -773,15 +775,15 @@ function draw(time: number) {
     join && !!identity && matchMedia("(pointer: coarse)").matches;
   const viewport = { width: r.width, height: r.height };
   const follow = join && identity ? !playerOverview : followCamera;
-  const framingTarget = cameraTarget(state, follow, viewport);
+  const localCameraId = join ? identity : null;
+  const focus = cameraFocus(state, localCameraId);
+  const framingTarget = cameraTarget(state, follow, viewport, localCameraId);
   camera = smoothCamera(
     camera,
     framingTarget,
     dt,
     viewport,
-    framingTarget.zoom > 1
-      ? { x: state.ball.x + 60, y: state.ball.y + 50 }
-      : undefined,
+    framingTarget.zoom > 1 ? { x: focus.x + 60, y: focus.y + 50 } : undefined,
   );
   world3d.render(state, time, dt, camera, identity, r.width, r.height);
   const fx = document.querySelector<HTMLCanvasElement>("#arena-fx")!,
@@ -819,26 +821,29 @@ function draw(time: number) {
     );
     html = `<span class="eyebrow">${n > 3 ? "GET READY" : "GET SET"}</span><strong>${n > 3 ? "GET READY" : n}</strong><p>MOVE · Joystick &nbsp; PASS · Tap &nbsp; SHOOT · Hold &nbsp; DASH · Button</p>`;
   }
-  if (phase === "REORG") {
-    html = reorgView(state, identity);
-    drawCelebration(ctx, time, true);
+  if (phase === "RULES_COUNTDOWN") {
+    const n = Math.max(
+      1,
+      Math.ceil((state.deadline - (Date.now() + serverOffset)) / 1000),
+    );
+    html = `<div class="new-rules"><h2><span>NEW RULES.</span> <span>SAME TEAMS.</span> <span>PLAY ON.</span></h2><div class="rules-countdown"><b>${n}</b><span>3 BALLS<br><small>SCORE ALL 3 TO RESET</small></span></div></div>`;
   }
   if (phase === "WAITING")
-    html = `<span class="pitch-vs"><b>LEADERS</b><i>VS</i><b>WORKERS</b></span>`;
+    html = `<span class="pitch-vs"><b>BLUE TEAM</b><i>VS</i><b>ORANGE TEAM</b></span>`;
   if (phase === "PAUSED")
     html = "<strong>PAUSED</strong><p>Waiting for the host to resume</p>";
   if (phase === "GOAL" && state.celebration) {
     const c = state.celebration;
-    html = `<span class="eyebrow">${c.team}</span><strong class="goal-word">GOOOAL!</strong><p>⚽ ${esc(c.scorer)}</p>${c.passes >= 3 ? `<div class="team-goal">🤝 TEAM GOAL · ${c.passes} PASSES</div>` : ""}`;
+    html = `<span class="eyebrow">${teamName(c.team)}</span><strong class="goal-word">GOOOAL!</strong><p>⚽ ${esc(c.scorer)}</p>${c.passes >= 3 ? `<div class="team-goal">🤝 TEAM GOAL · ${c.passes} PASSES</div>` : ""}`;
     drawConfetti(ctx, time);
   }
   if (phase === "FINISHED") {
     const winner = state.ended
       ? "THANKS FOR PLAYING"
-      : state.score.LEADERS === state.score.WORKERS
+      : state.score.BLUE === state.score.ORANGE
         ? "A MATCH TO REMEMBER"
-        : `${state.score.LEADERS > state.score.WORKERS ? "LEADERS" : "WORKERS"} WIN!`;
-    html = `<span class="eyebrow">${state.ended ? "MATCH ENDED BY HOST" : "FULL TIME"}</span><strong>${state.score.LEADERS} — ${state.score.WORKERS}</strong><h2>${state.ended ? "" : "🏆 "}${winner}</h2>${!join && state.predictions.winner && state.predictions.total ? `<div class="audience-final">${state.predictions.totals[state.predictions.winner]} OF ${state.predictions.total} WINNING BETS</div>` : ""}`;
+        : `${teamName(state.score.BLUE > state.score.ORANGE ? "BLUE" : "ORANGE")} WINS!`;
+    html = `<span class="eyebrow">${state.ended ? "MATCH ENDED BY HOST" : "FULL TIME"}</span><strong>${state.score.BLUE} — ${state.score.ORANGE}</strong><h2>${state.ended ? "" : "🏆 "}${winner}</h2>${!join && state.predictions.winner && state.predictions.total ? `<div class="audience-final">${state.predictions.totals[state.predictions.winner]} OF ${state.predictions.total} WINNING BETS</div>` : ""}`;
     drawConfetti(ctx, time);
   }
   if (phase === "GOLDEN_GOAL")
@@ -848,29 +853,30 @@ function draw(time: number) {
     html = "<strong>GO!</strong>";
   if (phase === "PLAYING" && state.remaining <= 10)
     html = `<strong class="final-count">${Math.ceil(state.remaining)}</strong>`;
-  if (phase === "PLAYING" && state.remaining <= 60 && state.remaining > 56)
-    html = '<span class="golden-banner">🔥 FINAL MINUTE 🔥</span>';
+  if (
+    phase === "PLAYING" &&
+    state.multiball &&
+    state.celebration &&
+    Date.now() + serverOffset - state.celebration.at < 2200
+  ) {
+    const c = state.celebration;
+    html += `<div class="live-goal ${teamClass(c.team)}"><b>GOAL! ${teamName(c.team)}</b><span>⚽ ${esc(c.scorer)}${c.passes >= 3 ? " · TEAM GOAL" : ""}</span></div>`;
+  }
+  const counter = document.querySelector<HTMLElement>("#balls-remaining");
+  if (counter) {
+    const remaining = state.balls.filter((ball) => !ball.scored).length;
+    counter.hidden =
+      !state.multiball || !["PLAYING", "GOLDEN_GOAL"].includes(phase);
+    const label = `${remaining} / 3 BALLS`;
+    if (counter.textContent !== label) counter.textContent = label;
+  }
   if (overlayElement !== overlay || overlayHtml !== html) {
     overlay.innerHTML = html;
     overlayHtml = html;
     overlayElement = overlay;
   }
   const overlayClass = `arena-overlay ${["PLAYING", "GOLDEN_GOAL"].includes(phase) ? "playing" : phase.toLowerCase()}`;
-  const revealed =
-    phase === "REORG" &&
-    state.deadline - (Date.now() + serverOffset) <=
-      (REORG.revealSeconds - REORG.introSeconds) * 1000;
-  const finalOverlayClass = overlayClass + (revealed ? " reorg-revealed" : "");
-  if (overlay.className !== finalOverlayClass)
-    overlay.className = finalOverlayClass;
-  const reorgSeconds = document.querySelector("#reorg-seconds");
-  if (reorgSeconds)
-    reorgSeconds.textContent = String(
-      Math.max(
-        0,
-        Math.ceil((state.deadline - Date.now() - serverOffset) / 1000),
-      ),
-    );
+  if (overlay.className !== overlayClass) overlay.className = overlayClass;
   const bar = document.querySelector<HTMLElement>("#charge-bar");
   if (bar)
     bar.style.width = charging
@@ -880,7 +886,10 @@ function draw(time: number) {
   if (shoot) {
     const charge = charging ? Math.min(100, (time - chargeStarted) / 10) : 0;
     shoot.style.setProperty("--charge", `${charge}%`);
-    shoot.classList.toggle("has-ball", state.ball.owner === identity);
+    shoot.classList.toggle(
+      "has-ball",
+      state.balls.some((ball) => !ball.scored && ball.owner === identity),
+    );
     const text = shoot.querySelector("small");
     if (text) text.textContent = charging ? "RELEASE" : "PASS / SHOOT";
   }
@@ -930,15 +939,18 @@ function drawOverview(
   c.rect(0, 0, 1200, 700);
   c.clip();
   for (const p of state.players) {
-    c.fillStyle = p.team === "LEADERS" ? "#72b2f0" : "#f7aa70";
+    c.fillStyle = p.team === "BLUE" ? "#72b2f0" : "#f7aa70";
     c.beginPath();
     c.arc(p.x, p.y, 16, 0, Math.PI * 2);
     c.fill();
   }
-  c.fillStyle = "#fffce1";
-  c.beginPath();
-  c.arc(state.ball.x, state.ball.y, 16, 0, Math.PI * 2);
-  c.fill();
+  for (const ball of state.balls) {
+    if (ball.scored) continue;
+    c.fillStyle = "#fffce1";
+    c.beginPath();
+    c.arc(ball.x, ball.y, 19, 0, Math.PI * 2);
+    c.fill();
+  }
   c.strokeStyle = "#dbf995";
   c.lineWidth = 7;
   const half = visibleHalfExtents(view, viewport);
@@ -951,7 +963,7 @@ function drawOverview(
   c.restore();
 }
 function drawConfetti(c: CanvasRenderingContext2D, t: number) {
-  drawCelebration(c, t, state?.celebration?.team === "LEADERS");
+  drawCelebration(c, t, state?.celebration?.team === "BLUE");
 }
 
 app.innerHTML = header() + '<main class="loading"><h1>Connecting…</h1></main>';

@@ -1,10 +1,9 @@
 import { Predictions } from "./predictions.js";
-import { randomBytes, randomInt } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import {
   DEFAULT_MATCH_DURATION_SECONDS,
   FIELD as F,
-  REORG,
-  type Reorg,
+  MULTIBALL_COUNTDOWN_SECONDS,
   TEAMS,
   type Team,
   type Phase,
@@ -24,11 +23,39 @@ export class Game {
   phase: Phase = "WAITING";
   deadline = 0;
   remaining: number;
-  score = { LEADERS: 0, WORKERS: 0 };
-  ball: Ball = this.newBall();
+  score = { BLUE: 0, ORANGE: 0 };
+  private ballSequence = 0;
+  balls: Ball[] = [this.newBall()];
+  multiball = false;
+  // The primary live ball remains available for existing tooling and snapshots.
+  get ball(): Ball {
+    return this.balls.find((b) => !b.scored) ?? this.balls[0];
+  }
+  set ball(ball: Ball) {
+    this.balls = [ball];
+  }
+  get possessionTeam() {
+    return this.ball.possessionTeam;
+  }
+  set possessionTeam(team: Team | null) {
+    this.ball.possessionTeam = team;
+  }
+  get passes() {
+    return this.ball.passes;
+  }
+  set passes(passes: number) {
+    this.ball.passes = passes;
+  }
+  get passFrom() {
+    return this.ball.passFrom;
+  }
+  set passFrom(id: string | null) {
+    this.ball.passFrom = id;
+  }
+  private ownedBall(id: string) {
+    return this.balls.find((b) => !b.scored && b.owner === id);
+  }
   celebration: Celebration | null = null;
-  reorg: Reorg | null = null;
-  reorgDone = false;
   finalMinuteAnnounced = false;
   golden = false;
   ended = false;
@@ -37,9 +64,6 @@ export class Game {
   private eventTime = 0;
   resumePhase: Phase = "PLAYING";
   pausedDeadline = 0;
-  possessionTeam: Team | null = null;
-  passes = 0;
-  passFrom: string | null = null;
   nextId = 0;
   constructor(
     public config = {
@@ -54,6 +78,13 @@ export class Game {
   }
   newBall(): Ball {
     return {
+      id: `ball-${++this.ballSequence}`,
+      height: 0,
+      vz: 0,
+      scored: false,
+      possessionTeam: null,
+      passes: 0,
+      passFrom: null,
       x: 600,
       y: 350,
       vx: 0,
@@ -113,7 +144,7 @@ export class Game {
       bot: false,
       x: 0,
       y: 0,
-      fx: team === "LEADERS" ? 1 : -1,
+      fx: team === "BLUE" ? 1 : -1,
       fy: 0,
       dashUntil: 0,
       dashReady: 0,
@@ -155,7 +186,8 @@ export class Game {
     }
   }
   remove(id: string) {
-    if (this.ball.owner === id) this.release(0.2, this.eventTime);
+    const ball = this.ownedBall(id);
+    if (ball) this.release(0.2, this.eventTime, ball);
     this.players.delete(id);
     for (const [t, p] of this.sessions) if (p === id) this.sessions.delete(t);
   }
@@ -168,20 +200,20 @@ export class Game {
         // halfway line. Single-player sides start opposite one another.
         const index = field.indexOf(p);
         const angle =
-          (team === "LEADERS" ? Math.PI : 0) +
+          (team === "BLUE" ? Math.PI : 0) +
           (field.length <= 1
             ? 0
             : (-Math.PI * 7) / 18 +
               (index * Math.PI * 7) / 9 / (field.length - 1));
         p.x = p.keeper
-          ? team === "LEADERS"
+          ? team === "BLUE"
             ? 70
             : 1130
           : F.width / 2 + Math.cos(angle) * F.centerCircleRadius;
         p.y = p.keeper
           ? F.height / 2
           : F.height / 2 + Math.sin(angle) * F.centerCircleRadius;
-        p.fx = team === "LEADERS" ? 1 : -1;
+        p.fx = team === "BLUE" ? 1 : -1;
         p.fy = 0;
         p.input = blank();
         p.chargeAt = 0;
@@ -203,7 +235,7 @@ export class Game {
       case "move":
         if (!p) throw Error("Player not found.");
         {
-          const team = p.team === "LEADERS" ? "WORKERS" : "LEADERS";
+          const team = p.team === "BLUE" ? "ORANGE" : "BLUE";
           if (this.count(team) >= this.config.maxTeamSize)
             throw Error("Destination team is full.");
           p.team = team;
@@ -248,9 +280,9 @@ export class Game {
             "PLAYING",
             "GOLDEN_GOAL",
             "COUNTDOWN",
+            "RULES_COUNTDOWN",
             "KICKOFF_COUNTDOWN",
             "GOAL",
-            "REORG",
           ].includes(this.phase)
         )
           throw Error("Cannot pause now.");
@@ -315,13 +347,12 @@ export class Game {
   reset() {
     this.events = [];
     this.remaining = this.config.duration;
-    this.score = { LEADERS: 0, WORKERS: 0 };
+    this.score = { BLUE: 0, ORANGE: 0 };
     this.ball = this.newBall();
+    this.multiball = false;
     this.golden = false;
     this.ended = false;
     this.celebration = null;
-    this.reorg = null;
-    this.reorgDone = false;
     this.finalMinuteAnnounced = false;
     this.passes = 0;
     this.passFrom = null;
@@ -368,11 +399,12 @@ export class Game {
     }
     if (a.action && !p.input.action) {
       p.chargeAt = now;
-      if (this.ball.owner === id) this.sound("shot_charge", now);
+      if (this.ownedBall(id)) this.sound("shot_charge", now);
     }
     if (!a.action && p.input.action) {
-      if (this.ball.owner === id && p.chargeAt)
-        this.release(clamp((now - p.chargeAt) / 1000, 0, 1), now);
+      const ball = this.ownedBall(id);
+      if (ball && p.chargeAt)
+        this.release(clamp((now - p.chargeAt) / 1000, 0, 1), now, ball);
       p.chargeAt = 0;
     }
     if (a.dash && !p.input.dash && now >= p.dashReady) {
@@ -383,9 +415,9 @@ export class Game {
     p.input = { ...a };
     p.inputAt = now;
   }
-  release(charge: number, now: number) {
+  release(charge: number, now: number, ball: Ball = this.ball) {
     this.eventTime = now;
-    const p = this.ball.owner && this.players.get(this.ball.owner);
+    const p = !ball.scored && ball.owner && this.players.get(ball.owner);
     if (!p) return;
     let fx = p.fx,
       fy = p.fy;
@@ -411,10 +443,10 @@ export class Game {
         fx = (best.x - p.x) / dist;
         fy = (best.y - p.y) / dist;
       }
-      this.passFrom = p.id;
-    } else this.passFrom = null;
+      ball.passFrom = p.id;
+    } else ball.passFrom = null;
     const speed = 440 + charge * 650;
-    Object.assign(this.ball, {
+    Object.assign(ball, {
       owner: null,
       vx: fx * speed,
       vy: fy * speed,
@@ -423,131 +455,67 @@ export class Game {
     });
     this.emit(charge < 0.22 ? "pass" : "shot");
   }
-  goal(team: Team, now: number) {
+  goal(team: Team, now: number, ball: Ball = this.ball) {
+    if (ball.scored || !["PLAYING", "GOLDEN_GOAL"].includes(this.phase)) return;
     this.eventTime = now;
     this.score[team]++;
-    const shooter = this.ball.lastTouch
-      ? this.players.get(this.ball.lastTouch)
+    const shooter = ball.lastTouch
+      ? this.players.get(ball.lastTouch)
       : undefined;
     this.celebration = {
+      at: now,
       team,
       scorer: shooter?.name ?? "TEAM",
-      passes: this.possessionTeam === team ? this.passes : 0,
+      passes: ball.possessionTeam === team ? ball.passes : 0,
       id: ++this.nextId,
     };
-    this.phase = "GOAL";
-    this.deadline = now + 3000;
-    this.clearInputs();
-    this.emit("goal_scored", this.celebration);
+    ball.scored = true;
+    ball.owner = null;
+    ball.vx = ball.vy = 0;
+    if (!this.multiball || this.golden || this.balls.every((b) => b.scored)) {
+      this.phase = "GOAL";
+      this.deadline = now + 3000;
+      this.clearInputs();
+    }
+    this.emit("goal_scored", { ...this.celebration, ballId: ball.id });
     if (this.celebration.passes >= 3) this.sound("team_goal", now);
   }
-  beginReorg(now: number) {
-    this.eventTime = now;
-    const players = [...this.players.values()];
-    const previous = new Map(
-      players.map((p) => [p.id, { team: p.team, keeper: p.keeper }]),
-    );
-    const keeperSlots = {
-      LEADERS: players.some((p) => p.team === "LEADERS" && p.keeper),
-      WORKERS: players.some((p) => p.team === "WORKERS" && p.keeper),
-    };
-    const hadBothConnected = TEAMS.every((t) => this.count(t, true) > 0);
-    let leaderSlots = this.count("LEADERS");
-    if (
-      players.length >= 2 &&
-      (leaderSlots === 0 || leaderSlots === players.length)
-    )
-      leaderSlots = Math.ceil(players.length / 2);
-    // Fisher–Yates uses server-side cryptographic randomness, never client assignments.
-    for (let i = players.length - 1; i > 0; i--) {
-      const j = randomInt(i + 1);
-      [players[i], players[j]] = [players[j], players[i]];
-    }
-    players.forEach((p, i) => {
-      p.team = i < leaderSlots ? "LEADERS" : "WORKERS";
-    });
-    const swap = (a: Player, b: Player) => {
-      [a.team, b.team] = [b.team, a.team];
-    };
-    // A reorg must not empty a connected side when both sides were playable.
-    if (hadBothConnected)
-      for (const team of TEAMS)
-        if (!this.count(team, true)) {
-          const recipient = players.find((p) => p.team === team)!;
-          const donor = players.filter((p) => p.team !== team && p.connected);
-          swap(recipient, donor[randomInt(donor.length)]);
-        }
-    // Reject the visible no-op: even a 1v1 must actually exchange sides.
-    if (
-      players.length > 1 &&
-      players.every((p) => p.team === previous.get(p.id)!.team)
-    ) {
-      const pool = (team: Team) =>
-        players.filter(
-          (p) => p.team === team && (!hadBothConnected || p.connected),
-        );
-      const leaders = pool("LEADERS"),
-        workers = pool("WORKERS");
-      if (leaders.length && workers.length)
-        swap(
-          leaders[randomInt(leaders.length)],
-          workers[randomInt(workers.length)],
-        );
-    }
-    for (const p of players) p.keeper = false;
-    for (const team of TEAMS)
-      if (keeperSlots[team]) {
-        const members = players.filter((p) => p.team === team);
-        const retained = members.filter((p) => previous.get(p.id)!.keeper);
-        const live = members.filter((p) => p.connected);
-        const candidates = retained.length
-          ? retained
-          : live.length
-            ? live
-            : members;
-        if (candidates.length)
-          candidates[randomInt(candidates.length)].keeper = true;
-      }
-    this.reorgDone = true;
-    this.reorg = {
-      id: ++this.nextId,
-      assignments: players.map((p) => ({
-        id: p.id,
-        name: p.name,
-        fromTeam: previous.get(p.id)!.team,
-        team: p.team,
-        keeper: p.keeper,
-      })),
-    };
-    this.phase = "REORG";
-    this.deadline = now + REORG.revealSeconds * 1000;
-    this.clearInputs();
+  private prepareKickoff() {
     this.positionPlayers();
     this.ball = this.newBall();
     this.celebration = null;
-    this.possessionTeam = null;
-    this.passes = 0;
-    this.passFrom = null;
-    this.emit("reorg_started", this.reorg);
+  }
+  private dropExtraBalls(now: number) {
+    if (!this.multiball || this.balls.length !== 1) return;
+    for (const [dx, dy] of [
+      [-40, -30],
+      [40, 30],
+    ]) {
+      const ball = this.newBall();
+      Object.assign(ball, { x: 600 + dx, y: 350 + dy, height: 300 });
+      this.balls.push(ball);
+    }
+    this.emit("balls_dropped");
+  }
+  private beginNewRules(now: number) {
+    this.finalMinuteAnnounced = true;
+    this.multiball = true;
+    this.remaining = 60;
+    this.prepareKickoff();
+    this.phase = "RULES_COUNTDOWN";
+    this.deadline = now + MULTIBALL_COUNTDOWN_SECONDS * 1000;
+    this.emit("final_minute");
   }
   tick(dt: number, now: number) {
     this.eventTime = now;
     for (const p of [...this.players.values()])
       if (!p.connected && now - p.disconnectedAt > this.config.grace * 1000)
         this.remove(p.id);
-    if (this.phase === "REORG") {
+    if (
+      ["COUNTDOWN", "KICKOFF_COUNTDOWN", "RULES_COUNTDOWN"].includes(this.phase)
+    ) {
       if (now >= this.deadline) {
-        this.positionPlayers();
-        this.ball = this.newBall();
-        this.clearInputs();
-        this.phase = "KICKOFF_COUNTDOWN";
-        this.deadline = now + REORG.kickoffSeconds * 1000;
-        this.emit("reorg_kickoff");
-      }
-      return;
-    }
-    if (["COUNTDOWN", "KICKOFF_COUNTDOWN"].includes(this.phase)) {
-      if (now >= this.deadline) {
+        this.dropExtraBalls(now);
         this.phase = this.golden ? "GOLDEN_GOAL" : "PLAYING";
         this.emit("go");
       }
@@ -559,11 +527,7 @@ export class Game {
           this.finish();
           return;
         }
-        this.positionPlayers();
-        this.ball = this.newBall();
-        this.possessionTeam = null;
-        this.passes = 0;
-        this.passFrom = null;
+        this.prepareKickoff();
         this.phase = "KICKOFF_COUNTDOWN";
         this.deadline = now + 3000;
       }
@@ -574,23 +538,16 @@ export class Game {
       const before = this.remaining;
       this.remaining = Math.max(0, this.remaining - dt);
       if (
-        !this.reorgDone &&
-        this.config.duration > REORG.remaining &&
-        before > REORG.remaining &&
-        this.remaining <= REORG.remaining
+        !this.finalMinuteAnnounced &&
+        this.config.duration > 60 &&
+        before >= 60 &&
+        this.remaining <= 60
       ) {
-        this.remaining = REORG.remaining;
-        this.beginReorg(now);
+        this.beginNewRules(now);
         return;
       }
-      // At 01:00 the Reorg takes priority; announce the final minute on the
-      // first active tick after its kickoff, without losing the sound cue.
-      if (!this.finalMinuteAnnounced && this.remaining <= 60) {
-        this.finalMinuteAnnounced = true;
-        this.emit("final_minute");
-      }
       if (this.remaining === 0) {
-        if (this.score.LEADERS === this.score.WORKERS) {
+        if (this.score.BLUE === this.score.ORANGE) {
           this.golden = true;
           this.phase = "GOLDEN_GOAL";
           this.emit("golden_goal_started");
@@ -602,40 +559,43 @@ export class Game {
     }
     for (const p of this.players.values()) {
       if (p.bot) {
-        const dir = p.team === "LEADERS" ? 1 : -1;
+        const liveBalls = this.balls.filter((b) => !b.scored);
+        const ball =
+          this.ownedBall(p.id) ??
+          liveBalls.reduce((a, b) =>
+            Math.hypot(p.x - a.x, p.y - a.y) <= Math.hypot(p.x - b.x, p.y - b.y)
+              ? a
+              : b,
+          );
+        const dir = p.team === "BLUE" ? 1 : -1;
         const teammates = [...this.players.values()].filter(
           (q) => q.team === p.team && !q.keeper,
         );
         const rank = [...teammates].sort(
           (a, b) =>
-            Math.hypot(a.x - this.ball.x, a.y - this.ball.y) -
-            Math.hypot(b.x - this.ball.x, b.y - this.ball.y),
+            Math.hypot(a.x - ball.x, a.y - ball.y) -
+            Math.hypot(b.x - ball.x, b.y - ball.y),
         );
         const index = Math.max(
           0,
           teammates.findIndex((q) => q.id === p.id),
         );
-        const owns = this.ball.owner === p.id;
-        const owner = this.ball.owner
-          ? this.players.get(this.ball.owner)
-          : null;
-        let tx = this.ball.x,
-          ty = this.ball.y;
-        if (
-          p.keeper &&
-          !this.inArea({ ...p, x: this.ball.x, y: this.ball.y })
-        ) {
-          tx = p.team === "LEADERS" ? 75 : 1125;
-          ty = clamp(this.ball.y, 260, 440);
+        const owns = ball.owner === p.id;
+        const owner = ball.owner ? this.players.get(ball.owner) : null;
+        let tx = ball.x,
+          ty = ball.y;
+        if (p.keeper && !this.inArea({ ...p, x: ball.x, y: ball.y })) {
+          tx = p.team === "BLUE" ? 75 : 1125;
+          ty = clamp(ball.y, 260, 440);
         } else if (owns) {
-          tx = p.team === "LEADERS" ? 1230 : -30;
+          tx = p.team === "BLUE" ? 1230 : -30;
           ty = 350;
         } else if (
           owner?.team === p.team ||
           rank.findIndex((q) => q.id === p.id) > 1
         ) {
           tx = clamp(
-            this.ball.x +
+            ball.x +
               dir * (owner?.team === p.team ? 200 : -170) +
               (index % 2) * dir * 70,
             180,
@@ -647,7 +607,7 @@ export class Game {
           dy = ty - p.y,
           d = Math.hypot(dx, dy),
           scale = Math.max(d, 60);
-        const attacking = p.team === "LEADERS" ? p.x > 760 : p.x < 440;
+        const attacking = p.team === "BLUE" ? p.x > 760 : p.x < 440;
         const hold = attacking ? 720 : 140;
         this.input(
           p.id,
@@ -686,7 +646,8 @@ export class Game {
       p.x = clamp(p.x + x * speed * dt, F.radius, F.width - F.radius);
       p.y = clamp(p.y + y * speed * dt, F.radius, F.height - F.radius);
       if (p.chargeAt && now - p.chargeAt >= 1100 && now - p.inputAt <= 350) {
-        if (this.ball.owner === p.id) this.release(1, now);
+        const ball = this.ownedBall(p.id);
+        if (ball) this.release(1, now, ball);
         p.chargeAt = 0;
       }
     }
@@ -714,7 +675,24 @@ export class Game {
           b.y = clamp(b.y + ny * force * (1 - share), 17, 683);
         }
       }
-    const ball = this.ball;
+    for (const ball of this.balls) {
+      if (!ball.scored) this.simulateBall(ball, dt, now, ps);
+      // A winning Golden Goal, or the third scored ball, ends this simulation tick.
+      if (!["PLAYING", "GOLDEN_GOAL"].includes(this.phase)) break;
+    }
+    this.collideBalls();
+  }
+  private simulateBall(ball: Ball, dt: number, now: number, ps: Player[]) {
+    if (ball.height > 0 || ball.vz !== 0) {
+      ball.vz -= 900 * dt;
+      ball.height += ball.vz * dt;
+      if (ball.height <= 0) {
+        ball.height = 0;
+        ball.vz = -ball.vz > 160 ? -ball.vz * 0.24 : 0;
+        this.sound("ball_landed", now);
+      }
+      return; // A falling ball cannot be possessed, blocked or scored mid-air.
+    }
     let owner = ball.owner ? this.players.get(ball.owner) : undefined;
     if (owner && (!owner.connected || !this.players.has(owner.id))) {
       ball.owner = null;
@@ -727,6 +705,7 @@ export class Game {
       const thief = ps.find(
         (p) =>
           p.connected &&
+          !this.ownedBall(p.id) &&
           p.team !== owner!.team &&
           Math.hypot(p.x - owner!.x, p.y - owner!.y) <
             (now < p.dashUntil ? 70 : 51),
@@ -742,15 +721,15 @@ export class Game {
           x: clamp(thief.x + thief.fx * 29, 9, 1191),
           y: clamp(thief.y + thief.fy * 29, 9, 691),
         });
-        this.possessionTeam = thief.team;
-        this.passes = 0;
-        this.passFrom = null;
+        ball.possessionTeam = thief.team;
+        ball.passes = 0;
+        ball.passFrom = null;
         this.sound("tackle", now);
       } else {
         ball.x = clamp(owner.x + owner.fx * 29, 9, 1191);
         ball.y = clamp(owner.y + owner.fy * 29, 9, 691);
         if (owner.keeper && this.inArea(owner) && now - ball.heldAt >= 2000)
-          this.release(0.3, now);
+          this.release(0.3, now, ball);
         return;
       }
     }
@@ -784,10 +763,10 @@ export class Game {
           ball.vy = (ball.vy - 2 * incoming * ny) * rebound;
           ball.lastTouch = p.id;
           ball.lockUntil = now + 150;
-          if (this.possessionTeam !== p.team) {
-            this.possessionTeam = p.team;
-            this.passes = 0;
-            this.passFrom = null;
+          if (ball.possessionTeam !== p.team) {
+            ball.possessionTeam = p.team;
+            ball.passes = 0;
+            ball.passFrom = null;
           }
           this.emit(p.keeper && this.inArea(p) ? "keeper_save" : "ball_bounce");
         }
@@ -804,7 +783,7 @@ export class Game {
         inGoal &&
         (ball.x < -F.ballRadius || ball.x > F.width + F.ballRadius)
       ) {
-        this.goal(ball.x < 0 ? "WORKERS" : "LEADERS", now);
+        this.goal(ball.x < 0 ? "ORANGE" : "BLUE", now, ball);
         return;
       }
       if (
@@ -830,6 +809,7 @@ export class Game {
         .filter(
           (p) =>
             p.connected &&
+            !this.ownedBall(p.id) &&
             Math.hypot(p.x - ball.x, p.y - ball.y) <
               (p.keeper && this.inArea(p) ? 54 : 34),
         )
@@ -840,14 +820,14 @@ export class Game {
         )[0];
       if (near) {
         const completed =
-          this.possessionTeam === near.team &&
-          this.passFrom &&
-          this.passFrom !== near.id;
-        if (this.possessionTeam !== near.team) {
-          this.passes = 0;
-          this.possessionTeam = near.team;
-        } else if (this.passFrom && this.passFrom !== near.id) this.passes++;
-        this.passFrom = null;
+          ball.possessionTeam === near.team &&
+          ball.passFrom &&
+          ball.passFrom !== near.id;
+        if (ball.possessionTeam !== near.team) {
+          ball.passes = 0;
+          ball.possessionTeam = near.team;
+        } else if (ball.passFrom && ball.passFrom !== near.id) ball.passes++;
+        ball.passFrom = null;
         this.sound(
           near.keeper && this.inArea(near)
             ? "keeper_catch"
@@ -866,9 +846,38 @@ export class Game {
       }
     }
   }
+  private collideBalls() {
+    const live = this.balls.filter(
+      (b) => !b.scored && !b.owner && b.height === 0 && b.vz === 0,
+    );
+    for (let i = 0; i < live.length; i++)
+      for (let j = i + 1; j < live.length; j++) {
+        const a = live[i],
+          b = live[j];
+        const dx = b.x - a.x,
+          dy = b.y - a.y,
+          distance = Math.hypot(dx, dy);
+        if (distance >= F.ballRadius * 2) continue;
+        const nx = distance > 0.001 ? dx / distance : 1,
+          ny = distance > 0.001 ? dy / distance : 0;
+        const push = (F.ballRadius * 2 - distance + 0.1) / 2;
+        a.x -= nx * push;
+        a.y -= ny * push;
+        b.x += nx * push;
+        b.y += ny * push;
+        const approach = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+        if (approach > 0) {
+          const impulse = approach * 0.85;
+          a.vx -= impulse * nx;
+          a.vy -= impulse * ny;
+          b.vx += impulse * nx;
+          b.vy += impulse * ny;
+        }
+      }
+  }
   inArea(p: Player) {
     return (
-      (p.team === "LEADERS" ? p.x < 155 : p.x > 1045) && p.y > 205 && p.y < 495
+      (p.team === "BLUE" ? p.x < 155 : p.x > 1045) && p.y > 205 && p.y < 495
     );
   }
   snapshot(now: number, includeEvents = true): Snapshot {
@@ -880,8 +889,9 @@ export class Game {
       score: this.score,
       players: [...this.players.values()],
       ball: this.ball,
+      balls: this.balls,
+      multiball: this.multiball,
       celebration: this.celebration,
-      reorg: this.reorg,
       golden: this.golden,
       ended: this.ended,
       predictions: this.predictions.summary(this.phase, this.score, this.ended),

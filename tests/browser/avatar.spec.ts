@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { Game } from "../../server/game";
 import type { Snapshot } from "../../src/shared";
 
-test("eyes turn rigidly with the head and team hair updates after Reorg", async ({
+test("eyes turn with the head; team colors stay fixed in play and update on a host lobby move", async ({
   page,
 }) => {
   const game = new Game({
@@ -11,8 +11,8 @@ test("eyes turn rigidly with the head and team hair updates after Reorg", async 
     grace: 20,
     dev: false,
   });
-  const local = game.join("TEST Alex", "LEADERS", 0);
-  const rival = game.join("TEST Sam", "WORKERS", 0);
+  const local = game.join("TEST Alex", "BLUE", 0);
+  const rival = game.join("TEST Sam", "ORANGE", 0);
   game.command("start", { confirm: true }, 0);
   let now = 0;
   const tick = () => {
@@ -49,16 +49,28 @@ test("eyes turn rigidly with the head and team hair updates after Reorg", async 
     }
     stages.push({ name, frames });
   }
-  while (game.phase === "PLAYING") tick();
-  expect(snapshot().phase).toBe("REORG");
-  expect(game.players.get(local.id)!.team).toBe("WORKERS");
-  expect(game.players.get(rival.id)!.team).toBe("LEADERS");
-  const reveal: Snapshot[] = [];
+  while (game.remaining > 59) tick();
+  expect(snapshot().phase).toBe("PLAYING");
+  expect(game.players.get(local.id)!.team).toBe("BLUE");
+  expect(game.players.get(rival.id)!.team).toBe("ORANGE");
+  const finale: Snapshot[] = [];
   for (let i = 0; i < 16; i++) {
     tick();
-    reveal.push(snapshot());
+    finale.push(snapshot());
   }
-  stages.push({ name: "reassigned", frames: reveal });
+  stages.push({ name: "final-minute", frames: finale });
+  game.command("end", { confirm: true }, now);
+  game.command("rematch_lobby", {}, now);
+  // Only an explicit pre-match host move changes kit and hair.
+  game.command("move", { id: local.id }, now);
+  game.command("move", { id: rival.id }, now);
+  const moved: Snapshot[] = [];
+  for (let i = 0; i < 16; i++) {
+    tick();
+    moved.push(snapshot());
+  }
+  stages.push({ name: "reassigned", frames: moved });
+  game.command("start", { confirm: true }, now);
   while (game.phase !== "PLAYING") tick();
   const dark: Snapshot[] = [];
   for (let i = 0; i < 16; i++) {
@@ -168,15 +180,15 @@ test("eyes turn rigidly with the head and team hair updates after Reorg", async 
   expect(
     result.samples.find((s) => s.name === "front" && s.player === local.id)
       ?.team,
-  ).toBe("LEADERS");
+  ).toBe("BLUE");
   expect(
     result.samples.find((s) => s.name === "reassigned" && s.player === local.id)
       ?.team,
-  ).toBe("WORKERS");
+  ).toBe("ORANGE");
   for (const sample of result.samples) {
     expect(sample.facing, sample.name).toBeGreaterThan(0.999);
     const rgb = sample.hair.match(/../g)!.map((hex) => parseInt(hex, 16));
-    if (sample.team === "LEADERS") {
+    if (sample.team === "BLUE") {
       expect(rgb[0]).toBeGreaterThan(200);
       expect(rgb[1]).toBeGreaterThan(150);
       expect(rgb[2]).toBeLessThan(190);

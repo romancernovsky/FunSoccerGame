@@ -79,7 +79,7 @@ try {
   rival = new WebSocket("ws://localhost:3106/ws");
   await new Promise((r) => rival.once("open", r));
   rival.send(
-    JSON.stringify({ type: "join", data: { name: "Alex", team: "WORKERS" } }),
+    JSON.stringify({ type: "join", data: { name: "Alex", team: "ORANGE" } }),
   );
   await wait(() => state.players.length === 2);
   send("start");

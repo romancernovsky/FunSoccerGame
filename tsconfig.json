@@ -17,6 +17,6 @@
     "vite.config.ts",
     "scripts",
     "playwright.config.ts",
-    "playwright.reorg.config.ts"
+    "playwright.final-minute.config.ts"
   ]
 }

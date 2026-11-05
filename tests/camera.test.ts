@@ -58,7 +58,7 @@ test("fast shots widen slightly and lead the ball without pulling back to the wh
 
 test("ball remains the focus when the local player is on the opposite side", () => {
   const game = new Game();
-  const { id } = game.join("Alex", "LEADERS", 0);
+  const { id } = game.join("Alex", "BLUE", 0);
   Object.assign(game.players.get(id)!, { x: 17, y: 17 });
   game.phase = "PLAYING";
   Object.assign(game.ball, { x: 1183, y: 683 });
@@ -88,7 +88,7 @@ test("kickoffs, goals and pauses retain close framing; rosters, lobby and full t
     assert.ok(cameraTarget(game.snapshot(0), true).zoom > 1);
     assert.deepEqual(cameraTarget(game.snapshot(0), false), overview());
   }
-  for (const phase of ["WAITING", "REORG", "FINISHED"] as const) {
+  for (const phase of ["WAITING", "FINISHED"] as const) {
     game.phase = phase;
     assert.deepEqual(cameraTarget(game.snapshot(0), true), overview());
   }
@@ -123,4 +123,31 @@ test("camera eases predictably and keeps fast ball corrections inside the visibl
         assert.ok(Math.abs(y + 50 - view.y) < half.y * 0.61);
       }
   }
+});
+
+test("three-ball broadcasts frame every remaining ball while phones stay close to their owned ball", () => {
+  const g = new Game();
+  const local = g.join("Alex", "BLUE", 0);
+  g.join("Sam", "ORANGE", 0);
+  g.phase = "PLAYING";
+  g.multiball = true;
+  g.balls = [g.newBall(), g.newBall(), g.newBall()];
+  Object.assign(g.balls[0], { x: 35, y: 45 });
+  Object.assign(g.balls[1], { x: 1160, y: 650 });
+  Object.assign(g.balls[2], { x: 1000, y: 250, owner: local.id });
+  const viewport = { width: 1280, height: 720 };
+  const broadcast = cameraTarget(g.snapshot(0), true, viewport);
+  const half = visibleHalfExtents(broadcast, viewport);
+  for (const ball of g.balls) {
+    assert.ok(Math.abs(ball.x + 60 - broadcast.x) < half.x);
+    assert.ok(Math.abs(ball.y + 50 - broadcast.y) < half.y);
+  }
+  const phone = { width: 740, height: 260 };
+  const view = cameraTarget(g.snapshot(0), true, phone, local.id);
+  assert.ok(view.x > 900);
+  assert.ok(visibleHalfExtents(view, phone).x * 2 < 901);
+  // Retired balls must never drag a camera away from the remaining action.
+  g.balls[0].scored = g.balls[1].scored = true;
+  const last = cameraTarget(g.snapshot(0), true, viewport);
+  assert.ok(last.x > 900);
 });

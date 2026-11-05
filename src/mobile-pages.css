@@ -140,8 +140,8 @@
   box-shadow: none;
   touch-action: manipulation;
 }
-.public-page .simple-panel .team-option.workers,
-.public-page .simple-panel .prediction-option.workers {
+.public-page .simple-panel .team-option.team-orange,
+.public-page .simple-panel .prediction-option.team-orange {
   background: #342c29;
   border-color: #f7aa7050;
   color: #ffc294;
@@ -210,10 +210,10 @@
   overflow-wrap: anywhere;
   color: #f2f6f5;
 }
-.public-page .joined-identity > .leaders {
+.public-page .joined-identity > .team-blue {
   color: #9ad3ff;
 }
-.public-page .joined-identity > .workers {
+.public-page .joined-identity > .team-orange {
   color: #ffc294;
 }
 .public-page .waiting-pill {

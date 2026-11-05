@@ -83,7 +83,7 @@ test(
       );
       const identity = await request(
         "join",
-        { name: "Alex", team: "LEADERS" },
+        { name: "Alex", team: "BLUE" },
         "identity",
       );
       assert.equal(identity.token.length, 48);
@@ -149,19 +149,19 @@ test(
         });
       assert.equal((await fetch("http://127.0.0.1:3102/bet")).status, 200);
       assert.equal((await fetch("http://127.0.0.1:3102/predict")).status, 200);
-      assert.equal((await pick("LEADERS")).status, 200);
-      const repeated = (await (await pick("LEADERS")).json()) as any;
+      assert.equal((await pick("BLUE")).status, 200);
+      const repeated = (await (await pick("BLUE")).json()) as any;
       assert.equal(repeated.predictions.total, 1);
-      assert.equal(repeated.pick, "LEADERS");
+      assert.equal(repeated.pick, "BLUE");
       assert.equal((await pick("INVALID")).status, 400);
-      assert.equal((await pick("WORKERS")).status, 200);
+      assert.equal((await pick("ORANGE")).status, 200);
       assert.equal(
-        (await pick("LEADERS", {}, { origin: "https://elsewhere.example" }))
+        (await pick("BLUE", {}, { origin: "https://elsewhere.example" }))
           .status,
         403,
       );
       assert.equal(
-        (await pick("LEADERS", { text: "x".repeat(1000) })).status,
+        (await pick("BLUE", { text: "x".repeat(1000) })).status,
         413,
       );
       const recovered = (await (
@@ -169,7 +169,7 @@ test(
           headers: { cookie },
         })
       ).json()) as any;
-      assert.equal(recovered.pick, "WORKERS");
+      assert.equal(recovered.pick, "ORANGE");
       // A failed start leaves predictions open; a successful start locks HTTP writes too.
       assert.match(
         (await request("command", { action: "start", confirm: true }, "error"))
@@ -186,12 +186,12 @@ test(
       );
       await request(
         "join",
-        { name: "Sam", team: "WORKERS" },
+        { name: "Sam", team: "ORANGE" },
         "identity",
         refreshedHost,
       );
       await request("command", { action: "start", confirm: true }, "state");
-      assert.equal((await pick("LEADERS")).status, 409);
+      assert.equal((await pick("BLUE")).status, 409);
       assert.match((await request("nonsense", {}, "error")).message, /Unknown/);
     } finally {
       for (const ws of clients) ws.terminate();

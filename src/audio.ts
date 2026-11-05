@@ -22,9 +22,11 @@ const GAMEPLAY = new Set([
   "keeper_save",
   "keeper_catch",
   "near_miss",
+  "ball_landed",
 ]);
 const COOLDOWN: Record<string, number> = {
   ball_bounce: 100,
+  ball_landed: 140,
   wall_bounce: 150,
   ball_control: 180,
   dash: 140,
@@ -298,14 +300,17 @@ export class MatchAudio {
     const playing = state.phase === "PLAYING" || state.phase === "GOLDEN_GOAL";
     if (
       this.phase !== state.phase &&
-      ["PAUSED", "REORG", "FINISHED", "WAITING"].includes(state.phase)
+      ["PAUSED", "FINISHED", "WAITING", "RULES_COUNTDOWN"].includes(state.phase)
     )
       this.stopVoices();
     this.phase = state.phase;
     this.playing = playing;
     this.crowdLevel = state.golden
       ? 0.19
-      : state.remaining <= 60 || state.ball.x < 180 || state.ball.x > 1020
+      : state.remaining <= 60 ||
+          state.balls.some(
+            (ball) => !ball.scored && (ball.x < 180 || ball.x > 1020),
+          )
         ? 0.16
         : 0.12;
     this.syncAmbience();
@@ -329,10 +334,19 @@ export class MatchAudio {
       }
       this.lastEvent = Math.max(this.lastEvent, latest);
     }
-    if (["COUNTDOWN", "KICKOFF_COUNTDOWN"].includes(state.phase)) {
+    if (
+      ["COUNTDOWN", "KICKOFF_COUNTDOWN", "RULES_COUNTDOWN"].includes(
+        state.phase,
+      )
+    ) {
       const n = Math.ceil((state.deadline - state.now) / 1000);
       const key = `${state.phase}:${state.deadline}:${n}`;
-      if (key !== this.countdown && n >= 1 && n <= 3) this.play("countdown");
+      if (
+        key !== this.countdown &&
+        n >= 1 &&
+        n <= (state.phase === "RULES_COUNTDOWN" ? 7 : 3)
+      )
+        this.play("countdown");
       this.countdown = key;
     } else this.countdown = "";
     const second = Math.ceil(state.remaining);

@@ -31,6 +31,11 @@ export const EFFECTS: Record<string, Part[]> = {
   shot: [{ clip: "shot", gain: 0.95 }],
   shot_charge: [{ clip: "step", gain: 0.24 }],
   ball_bounce: [{ clip: "net", gain: 0.65 }],
+  ball_landed: [{ clip: "shot", gain: 0.45, duration: 0.3 }],
+  balls_dropped: [
+    { clip: "reaction", gain: 0.45, duration: 1.3 },
+    { clip: "applause", gain: 0.35, delay: 0.2, duration: 1.4 },
+  ],
   ball_control: [{ clip: "net", gain: 0.3, duration: 0.24 }],
   wall_bounce: [{ clip: "shot", gain: 0.55 }],
   dash: [
@@ -87,13 +92,6 @@ export const EFFECTS: Record<string, Part[]> = {
     { clip: "cheer", gain: 0.45, delay: 0.15, duration: 2 },
     { clip: "whistle", gain: 0.55, delay: 1.1 },
   ],
-  reorg_started: [
-    { clip: "horn", gain: 0.7, duration: 1.4 },
-    { clip: "reaction", gain: 0.55, delay: 0.2, duration: 2.3 },
-    { clip: "clap", gain: 0.5, delay: 1.4 },
-    { clip: "clap", gain: 0.5, delay: 1.8 },
-  ],
-  reorg_kickoff: [{ clip: "whistle", gain: 0.5, duration: 0.24 }],
   crowd_clap: [
     { clip: "clap", gain: 0.35 },
     { clip: "clap", gain: 0.3, delay: 0.28 },

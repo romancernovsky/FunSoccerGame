@@ -87,8 +87,8 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
   const control = await wire(),
     a = await wire(),
     b = await wire();
-  await a.request("join", { name: "Alex", team: "LEADERS" }, "identity");
-  await b.request("join", { name: "Sam", team: "WORKERS" }, "identity");
+  await a.request("join", { name: "Alex", team: "BLUE" }, "identity");
+  await b.request("join", { name: "Sam", team: "ORANGE" }, "identity");
   const ctx = await browser.newContext({
     viewport: { width: 960, height: 640 },
   });
@@ -102,7 +102,7 @@ test("host and projector: actual 3D, broadcast, pause, refresh, rematch and rese
   try {
     await screen.goto("/screen");
     await expect(
-      screen.getByRole("heading", { name: "LEADERS vs WORKERS" }),
+      screen.getByRole("heading", { name: "BLUE TEAM vs ORANGE TEAM" }),
     ).toBeVisible();
     await host.goto("/host");
     const expectHost = async () => {
@@ -188,7 +188,7 @@ test("desktop player: fullscreen, keyboard movement and refresh restore the same
 }) => {
   const host = await (await wire()).asHost(),
     rival = await wire();
-  await rival.request("join", { name: "Sam", team: "WORKERS" }, "identity");
+  await rival.request("join", { name: "Sam", team: "ORANGE" }, "identity");
   const ctx = await browser.newContext({
       viewport: { width: 960, height: 640 },
     }),
@@ -276,7 +276,7 @@ test("mobile: short iPhone viewport, readable ball, player camera, honest fullsc
   test.setTimeout(180000);
   const host = await (await wire()).asHost(),
     rival = await wire();
-  await rival.request("join", { name: "Alex", team: "LEADERS" }, "identity");
+  await rival.request("join", { name: "Alex", team: "BLUE" }, "identity");
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -305,7 +305,7 @@ test("mobile: short iPhone viewport, readable ball, player camera, honest fullsc
     // available from Screen options during gameplay.
     await expect(page.locator("#fullscreen-guide")).toHaveCount(0);
     await page.locator("#name").fill("Mobile");
-    await page.locator('[data-team="WORKERS"]').click();
+    await page.locator('[data-team="ORANGE"]').click();
     await page.getByRole("button", { name: /^Play$/ }).click();
     await expect(page.getByText("You’re in")).toBeVisible();
     host.command("start");
@@ -476,7 +476,7 @@ test("overhead action camera: follows a distant ball on phones, spectator and ho
     rival = await wire();
   const opponent = await rival.request(
     "join",
-    { name: "TEST Rival", team: "WORKERS" },
+    { name: "TEST Rival", team: "ORANGE" },
     "identity",
   );
   const context = await browser.newContext({

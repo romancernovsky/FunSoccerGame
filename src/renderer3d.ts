@@ -1,6 +1,13 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { FIELD, type Player, type Snapshot } from "./shared";
+import {
+  FIELD,
+  teamName,
+  type Player,
+  type Snapshot,
+  type Ball,
+  type Team,
+} from "./shared";
 import { CAMERA_ELEVATION, cameraFrustum, type Camera } from "./camera";
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 function mat(color: string, metalness = 0) {
@@ -157,22 +164,25 @@ type Avatar = {
   left: THREE.Group;
   right: THREE.Group;
   ring: THREE.Mesh;
-  team: string;
+  team: Team;
   keeper: boolean;
   shirt: THREE.Mesh;
   gloves: THREE.Mesh[];
+};
+type BallVisual = {
+  root: THREE.Group;
+  surface: THREE.Group;
+  glow: THREE.Mesh;
+  trail: THREE.Mesh[];
+  history: THREE.Vector3[];
+  data: Ball;
 };
 export class Arena3D {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.OrthographicCamera();
   private actors = new Map<string, Avatar>();
-  private ball = new THREE.Group();
-  private ballSurface = new THREE.Group();
-  private ballShell: THREE.Mesh;
-  private ballGlow: THREE.Mesh;
-  private trail: THREE.Mesh[] = [];
-  private history: THREE.Vector3[] = [];
+  private ballActors = new Map<string, BallVisual>();
   private v = new THREE.Vector3();
   private width = 0;
   private height = 0;
@@ -233,9 +243,16 @@ export class Arena3D {
     rim.position.set(10, 6, -8);
     this.scene.add(rim);
     this.buildStadium();
-    this.ballSurface.position.y = 0.11;
-    this.ball.add(this.ballSurface);
-    this.ballShell = orb(this.ballSurface, 0, 0, 0, 0.115, "#fff5da");
+    this.camera.near = 0.1;
+    this.camera.far = 65;
+  }
+  private createBall(data: Ball): BallVisual {
+    const root = new THREE.Group(),
+      surface = new THREE.Group();
+    const trail: THREE.Mesh[] = [];
+    surface.position.y = 0.11;
+    root.add(surface);
+    orb(surface, 0, 0, 0, 0.115, "#fff5da");
     const patches = new THREE.Mesh(
       new THREE.IcosahedronGeometry(0.116, 0),
       new THREE.MeshStandardMaterial({
@@ -244,12 +261,12 @@ export class Arena3D {
         roughness: 0.6,
       }),
     );
-    this.ballSurface.add(patches);
+    surface.add(patches);
     const pentagon = new THREE.CircleGeometry(0.045, 5);
-    const patch = mesh(this.ballSurface, pentagon, mat("#193648"), 0, 0.109, 0);
+    const patch = mesh(surface, pentagon, mat("#193648"), 0, 0.109, 0);
     patch.rotation.x = -Math.PI / 2;
-    this.ballGlow = mesh(
-      this.ball,
+    const glow = mesh(
+      root,
       new THREE.RingGeometry(0.15, 0.18, 32),
       new THREE.MeshBasicMaterial({
         color: "#fff1a6",
@@ -262,9 +279,9 @@ export class Arena3D {
       0.012,
       0,
     );
-    this.ballGlow.rotation.x = -Math.PI / 2;
-    this.ballGlow.castShadow = false;
-    this.scene.add(this.ball);
+    glow.rotation.x = -Math.PI / 2;
+    glow.castShadow = false;
+    this.scene.add(root);
     for (let i = 0; i < 10; i++) {
       const m = mesh(
         this.scene,
@@ -281,10 +298,24 @@ export class Arena3D {
         0.03,
       );
       m.visible = false;
-      this.trail.push(m);
+      trail.push(m);
     }
-    this.camera.near = 0.1;
-    this.camera.far = 65;
+    root.position.set(data.x / 100, data.height / 100, data.y / 100);
+    return { root, surface, glow, trail, history: [], data };
+  }
+  private removeBall(actor: BallVisual) {
+    this.scene.remove(actor.root, ...actor.trail);
+    for (const root of [actor.root, ...actor.trail])
+      root.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        if (child.geometry !== sphere) child.geometry.dispose();
+        const list = Array.isArray(child.material)
+          ? child.material
+          : [child.material];
+        for (const material of list)
+          if (![...materials.values()].some((shared) => shared === material))
+            material.dispose();
+      });
   }
   private buildStadium() {
     const scene = this.scene;
@@ -313,9 +344,9 @@ export class Arena3D {
         mesh(scene, cube, glow, i + 0.5, 0.335, z, 0.94, 0.028, 0.08);
       }
       for (const [x, label, color] of [
-        [2.1, "LEADERS", "#83d3ff"],
+        [2.1, "BLUE TEAM", "#83d3ff"],
         [6, "OFFICE ARENA", "#e3f8bc"],
-        [9.9, "WORKERS", "#ffc38a"],
+        [9.9, "ORANGE TEAM", "#ffc38a"],
       ] as const) {
         const sign = new THREE.Mesh(
           new THREE.PlaneGeometry(2.7, 0.23),
@@ -478,7 +509,7 @@ export class Arena3D {
     right.position.set(0.09, 0, 0);
     const hash = [...p.id].reduce((a, v) => a + v.charCodeAt(0), 0),
       skin = ["#edbf97", "#b97c55", "#f3cfa5", "#805039", "#d5a078"][hash % 5],
-      blue = p.team === "LEADERS",
+      blue = p.team === "BLUE",
       hair = (
         blue
           ? ["#f5d77e", "#e9c361", "#ffe3a0", "#e4ba58"]
@@ -669,8 +700,6 @@ export class Arena3D {
       this.lowQuality = true;
       this.renderer.setPixelRatio(0.85);
     }
-    if (this.clock === 0)
-      this.ball.position.set(state.ball.x / 100, 0, state.ball.y / 100);
     const frustum = cameraFrustum({ width, height });
     this.camera.left = -frustum.halfWidth / 100;
     this.camera.right = frustum.halfWidth / 100;
@@ -740,36 +769,67 @@ export class Arena3D {
       a.body.position.y = moving
         ? Math.abs(step) * 0.025
         : Math.sin(time / 500 + p.x) * 0.008;
-      a.ring.visible = p.id === localId || state.ball.owner === p.id;
+      a.ring.visible =
+        p.id === localId ||
+        state.balls.some((b) => !b.scored && b.owner === p.id);
       (a.ring.material as THREE.MeshBasicMaterial).color.set(
         p.id === localId ? "#dcff83" : "#ffe4a1",
       );
       a.ring.scale.setScalar(p.id === localId ? 1.15 : 1);
       a.root.visible = p.connected || Math.floor(time / 350) % 2 === 0;
     }
-    this.ball.position.x +=
-      (state.ball.x / 100 - this.ball.position.x) * smoothing;
-    this.ball.position.z +=
-      (state.ball.y / 100 - this.ball.position.z) * smoothing;
-    this.ballSurface.rotation.x += state.ball.vy * dt * 0.025;
-    this.ballSurface.rotation.z -= state.ball.vx * dt * 0.025;
-    this.ballGlow.scale.setScalar(1 + Math.sin(time / 180) * 0.1);
-    this.history.push(this.ball.position.clone());
-    if (this.history.length > 10) this.history.shift();
-    const fast =
-      Math.hypot(state.ball.vx, state.ball.vy) > 180 && !state.ball.owner;
-    this.trail.forEach((m, i) => {
-      const point = this.history[i];
-      m.visible = !!point && fast;
-      if (point) {
-        m.position.copy(point);
-        m.position.y = 0.11;
-        m.scale.setScalar(0.025 + i * 0.006);
+    const ballIds = new Set(state.balls.map((b) => b.id));
+    for (const [id, actor] of this.ballActors)
+      if (!ballIds.has(id)) {
+        this.removeBall(actor);
+        this.ballActors.delete(id);
       }
-    });
+    for (const ball of state.balls) {
+      let actor = this.ballActors.get(ball.id);
+      if (!actor) {
+        actor = this.createBall(ball);
+        this.ballActors.set(ball.id, actor);
+      }
+      actor.data = ball;
+      actor.root.visible = !ball.scored;
+      actor.root.position.x +=
+        (ball.x / 100 - actor.root.position.x) * smoothing;
+      actor.root.position.z +=
+        (ball.y / 100 - actor.root.position.z) * smoothing;
+      actor.root.position.y +=
+        (ball.height / 100 - actor.root.position.y) * smoothing;
+      actor.surface.rotation.x += (ball.vy + ball.vz * 0.3) * dt * 0.025;
+      actor.surface.rotation.z -= ball.vx * dt * 0.025;
+      // The landing halo stays on the turf while the actual 3D ball falls above it.
+      actor.glow.position.y = 0.012 - actor.root.position.y;
+      actor.glow.scale.setScalar(
+        ball.height > 0
+          ? 1.5 + Math.sin(time / 90) * 0.15
+          : 1 + Math.sin(time / 180) * 0.1,
+      );
+      actor.history.push(actor.root.position.clone());
+      if (actor.history.length > 10) actor.history.shift();
+      const fast =
+        !ball.scored && Math.hypot(ball.vx, ball.vy) > 180 && !ball.owner;
+      actor.trail.forEach((m, i) => {
+        const point = actor.history[i];
+        m.visible = !!point && fast;
+        if (point) {
+          m.position.copy(point);
+          m.position.y += 0.11;
+          m.scale.setScalar(0.025 + i * 0.006);
+        }
+      });
+    }
+    this.renderer.domElement.dataset.liveBalls = String(
+      state.balls.filter((b) => !b.scored).length,
+    );
+    this.renderer.domElement.dataset.ballHeights = JSON.stringify(
+      state.balls.filter((b) => !b.scored).map((b) => b.height),
+    );
     const local = localId ? this.actors.get(localId) : null;
     const label = local
-      ? `Live 3D football arena. Your kit is ${local.team === "LEADERS" ? "blue (LEADERS)" : "orange (WORKERS)"}.`
+      ? `Live 3D football arena. Your kit is ${local.team === "BLUE" ? "blue" : "orange"} (${teamName(local.team)}).`
       : "Live 3D football arena";
     if (this.renderer.domElement.getAttribute("aria-label") !== label)
       this.renderer.domElement.setAttribute("aria-label", label);
@@ -779,7 +839,19 @@ export class Arena3D {
   }
   /** Readability assist only: ball physics and authoritative coordinates are unchanged. */
   drawMobileBall(c: CanvasRenderingContext2D, localId: string) {
-    const p = this.project(this.ball.position.x, 0.13, this.ball.position.z);
+    const visible = [];
+    for (const actor of this.ballActors.values()) {
+      if (!actor.data.scored) visible.push(this.drawBallMarker(c, actor));
+    }
+    c.canvas.dataset.ballsVisible = String(visible.filter(Boolean).length);
+    c.canvas.dataset.liveBalls = String(visible.length);
+  }
+  private drawBallMarker(c: CanvasRenderingContext2D, actor: BallVisual) {
+    const p = this.project(
+      actor.root.position.x,
+      actor.root.position.y + 0.13,
+      actor.root.position.z,
+    );
     const x = (p.x * this.width) / 1320,
       y = (p.y * this.height) / 800;
     const blockedByThumb =
@@ -870,6 +942,7 @@ export class Arena3D {
     c.canvas.dataset.ballCorePixels = "14";
     c.canvas.dataset.ballX = x.toFixed(1);
     c.canvas.dataset.ballY = y.toFixed(1);
+    return visible;
   }
   drawPlayerLocation(
     c: CanvasRenderingContext2D,
@@ -999,8 +1072,16 @@ export class Arena3D {
     c.font = `800 ${fontSize}px sans-serif`;
     for (const { p, a } of actors.sort(
       (a, b) =>
-        (b.p.id === localId ? 2 : b.p.id === state.ball.owner ? 1 : 0) -
-        (a.p.id === localId ? 2 : a.p.id === state.ball.owner ? 1 : 0),
+        (b.p.id === localId
+          ? 2
+          : state.balls.some((ball) => !ball.scored && ball.owner === b.p.id)
+            ? 1
+            : 0) -
+        (a.p.id === localId
+          ? 2
+          : state.balls.some((ball) => !ball.scored && ball.owner === a.p.id)
+            ? 1
+            : 0),
     )) {
       const ground = this.project(a.root.position.x, 0, a.root.position.z),
         head = this.project(a.root.position.x, 1.05, a.root.position.z);
@@ -1030,7 +1111,12 @@ export class Arena3D {
         }
         if (found) break;
       }
-      if (mobile && !found && p.id !== localId && p.id !== state.ball.owner)
+      if (
+        mobile &&
+        !found &&
+        p.id !== localId &&
+        !state.balls.some((ball) => !ball.scored && ball.owner === p.id)
+      )
         continue;
       placed.push(box);
       c.lineWidth = 1;
@@ -1038,14 +1124,14 @@ export class Arena3D {
         Math.abs(box.x + w / 2 - ground.x) > 15 ||
         Math.abs(box.y - ground.y - 9) > 10
       ) {
-        c.strokeStyle = p.team === "LEADERS" ? "#a3dbff8a" : "#ffce9a8a";
+        c.strokeStyle = p.team === "BLUE" ? "#a3dbff8a" : "#ffce9a8a";
         c.beginPath();
         c.moveTo(ground.x, ground.y);
         c.lineTo(box.x + w / 2, box.y + h / 2);
         c.stroke();
       }
       c.fillStyle = p.id === localId ? "#dfff93" : "#102739ed";
-      c.strokeStyle = p.team === "LEADERS" ? "#92d6ff99" : "#ffc99299";
+      c.strokeStyle = p.team === "BLUE" ? "#92d6ff99" : "#ffc99299";
       c.beginPath();
       c.roundRect(box.x, box.y, w, h, 6);
       c.fill();

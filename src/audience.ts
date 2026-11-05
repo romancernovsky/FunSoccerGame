@@ -1,5 +1,11 @@
 import { publicHeader } from "./public-header";
-import { TEAMS, type AudienceState, type Team } from "./shared";
+import {
+  TEAMS,
+  teamName,
+  teamClass,
+  type AudienceState,
+  type Team,
+} from "./shared";
 import { predictionSummary } from "./prediction-view";
 
 const escape = (s: string) =>
@@ -24,15 +30,15 @@ export function startAudience(app: HTMLElement) {
     if (!state) return "CONNECTING";
     const p = state.predictions;
     if (p.outcome === "VOID") return "MATCH ENDED";
-    if (p.winner) return `${p.winner} WIN!`;
+    if (p.winner) return `${teamName(p.winner)} WINS!`;
     return (
       (
         {
           WAITING: "WAITING FOR THE HOST",
           COUNTDOWN: "GET READY",
+          RULES_COUNTDOWN: "NEW RULES. SAME TEAMS. PLAY ON.",
           PAUSED: "MATCH PAUSED",
           GOAL: "GOOOAL!",
-          REORG: "REORG",
           KICKOFF_COUNTDOWN: "KICKOFF",
           GOLDEN_GOAL: "GOLDEN GOAL · NEXT GOAL WINS",
         } as Record<string, string>
@@ -62,13 +68,13 @@ export function startAudience(app: HTMLElement) {
           : p.winner
             ? state.pick === p.winner
               ? "Your bet won!"
-              : `${p.winner} win`
+              : `${teamName(p.winner)} wins`
             : state.pick
-              ? `Your bet: ${state.pick}`
+              ? `Your bet: ${teamName(state.pick)}`
               : p.open
                 ? "Choose a team"
                 : "Bets closed";
-      app.innerHTML = `${publicHeader("bet", online)}<main class="audience-main public-content simple-panel"><h1>Bet on the winner</h1><p class="bet-note">For fun. No money.</p>${state.phase !== "WAITING" ? `<section class="audience-match"><div class="audience-status" role="status">${status()}</div><div class="audience-score"><span>LEADERS</span><strong>${state.score.LEADERS}<i>:</i>${state.score.WORKERS}</strong><span>WORKERS</span></div><div class="audience-clock" id="audience-clock"></div></section>` : ""}<section class="prediction-pick"><p id="your-prediction" role="status">${result}</p><div class="prediction-options">${TEAMS.map((team) => `<button class="prediction-option ${team.toLowerCase()} ${state!.pick === team ? "is-picked" : ""}" data-predict="${team}" aria-pressed="${state!.pick === team}" ${!p.open || saving || !online ? "disabled" : ""}><strong>${team}</strong><small>${state!.pick === team ? "✓ Your bet" : p.open ? "Bet" : "Closed"}</small></button>`).join("")}</div>${p.open ? '<p class="prediction-note">Bets close when the host starts.</p>' : ""}<div class="prediction-error" role="alert">${escape(error)}</div></section>${predictionSummary(p)}${!online ? '<p class="audience-connection" role="status">Reconnecting…</p>' : ""}</main>`;
+      app.innerHTML = `${publicHeader("bet", online)}<main class="audience-main public-content simple-panel"><h1>Bet on the winner</h1><p class="bet-note">For fun. No money.</p>${state.phase !== "WAITING" ? `<section class="audience-match"><div class="audience-status" role="status">${status()}</div><div class="audience-score"><span>BLUE TEAM</span><strong>${state.score.BLUE}<i>:</i>${state.score.ORANGE}</strong><span>ORANGE TEAM</span></div><div class="audience-clock" id="audience-clock"></div></section>` : ""}<section class="prediction-pick"><p id="your-prediction" role="status">${result}</p><div class="prediction-options">${TEAMS.map((team) => `<button class="prediction-option ${teamClass(team)} ${state!.pick === team ? "is-picked" : ""}" data-predict="${team}" aria-pressed="${state!.pick === team}" ${!p.open || saving || !online ? "disabled" : ""}><strong>${teamName(team)}</strong><small>${state!.pick === team ? "✓ Your bet" : p.open ? "Bet" : "Closed"}</small></button>`).join("")}</div>${p.open ? '<p class="prediction-note">Bets close when the host starts.</p>' : ""}<div class="prediction-error" role="alert">${escape(error)}</div></section>${predictionSummary(p)}${!online ? '<p class="audience-connection" role="status">Reconnecting…</p>' : ""}</main>`;
       app
         .querySelectorAll<HTMLButtonElement>("[data-predict]")
         .forEach((button) =>

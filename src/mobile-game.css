@@ -201,17 +201,6 @@
   .game-main .arena-overlay {
     padding-bottom: 0;
   }
-  .game-main .player-game:has(.arena-overlay.reorg) > .arena-wrap {
-    grid-area: 1 / 1 / -1 / -1;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 8;
-  }
-  .game-main .player-game:has(.arena-overlay.reorg) > .player-scoreboard {
-    visibility: hidden;
-  }
   .game-main:has(.arena-overlay.paused) .mobile-controls,
   .game-main:has(.arena-overlay.goal) .mobile-controls,
   .game-main:has(.arena-overlay.finished) .mobile-controls {
@@ -429,7 +418,7 @@
     margin-top: 7px;
     white-space: nowrap;
   }
-  .attack-direction.workers {
+  .attack-direction.team-orange {
     color: #ffc28d;
   }
 }
@@ -604,7 +593,7 @@
     font-size: 12px;
     color: #94d6ff;
   }
-  .game-main .attack-direction.workers {
+  .game-main .attack-direction.team-orange {
     color: #ffc28d;
   }
 }

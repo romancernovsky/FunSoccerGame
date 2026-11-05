@@ -23,7 +23,7 @@ export class Predictions {
     string,
     { team: Team; windowAt: number; changes: number }
   >();
-  private counts: Record<Team, number> = { LEADERS: 0, WORKERS: 0 };
+  private counts: Record<Team, number> = { BLUE: 0, ORANGE: 0 };
   pick(token: string) {
     return this.picks.get(token)?.team ?? null;
   }
@@ -31,7 +31,7 @@ export class Predictions {
     this.roundId = randomBytes(8).toString("hex");
     this.locked = false;
     this.picks.clear();
-    this.counts = { LEADERS: 0, WORKERS: 0 };
+    this.counts = { BLUE: 0, ORANGE: 0 };
   }
   choose(
     token: string,
@@ -48,7 +48,7 @@ export class Predictions {
     if (this.locked || phase !== "WAITING")
       throw new PredictionError("Bets are locked.", 409);
     if (typeof team !== "string" || !TEAMS.includes(team as Team))
-      throw new PredictionError("Choose LEADERS or WORKERS.");
+      throw new PredictionError("Choose Blue Team or Orange Team.");
     const previous = this.picks.get(token);
     if (previous?.team === team) return;
     if (previous && now - previous.windowAt < 1000 && previous.changes >= 5)
@@ -75,10 +75,10 @@ export class Predictions {
   ): PredictionSummary {
     const finished = phase === "FINISHED";
     const winner =
-      finished && !ended && score.LEADERS !== score.WORKERS
-        ? score.LEADERS > score.WORKERS
-          ? "LEADERS"
-          : "WORKERS"
+      finished && !ended && score.BLUE !== score.ORANGE
+        ? score.BLUE > score.ORANGE
+          ? "BLUE"
+          : "ORANGE"
         : null;
     return {
       roundId: this.roundId,

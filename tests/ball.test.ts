@@ -4,11 +4,11 @@ import { Game } from "../server/game";
 import { FIELD, type Team } from "../src/shared";
 
 const now = 100000;
-function setup(defenderTeam: Team = "WORKERS") {
+function setup(defenderTeam: Team = "ORANGE") {
   const g = new Game({ duration: 180, maxTeamSize: 6, grace: 20, dev: false });
-  const a = g.join("Alex", "LEADERS", now);
-  const b = g.join("Sam", "WORKERS", now);
-  const target = defenderTeam === "LEADERS" ? g.join("Lee", "LEADERS", now) : b;
+  const a = g.join("Alex", "BLUE", now);
+  const b = g.join("Sam", "ORANGE", now);
+  const target = defenderTeam === "BLUE" ? g.join("Lee", "BLUE", now) : b;
   g.command("start", { confirm: true }, now);
   g.tick(0, now + 4000);
   for (const p of g.players.values()) Object.assign(p, { x: 100, y: 100 });
@@ -19,7 +19,7 @@ function setup(defenderTeam: Team = "WORKERS") {
   return { g, shooter, defender };
 }
 
-for (const team of ["WORKERS", "LEADERS"] as const) {
+for (const team of ["ORANGE", "BLUE"] as const) {
   test(`a charged shot rebounds off a ${team} player during the kick pickup lock`, () => {
     const { g, shooter, defender } = setup(team);
     Object.assign(g.ball, { owner: shooter.id, x: 529, y: 350 });
@@ -51,7 +51,7 @@ test("a player can block a shot before it crosses the goal line", () => {
   defender.x = 1183;
   Object.assign(g.ball, { x: 1130, y: 350, vx: 1090, vy: 0 });
   g.tick(0.1, now + 4200);
-  assert.equal(g.score.LEADERS, 0);
+  assert.equal(g.score.BLUE, 0);
   assert.equal(g.phase, "PLAYING");
   assert.ok(g.ball.vx < 0);
 });

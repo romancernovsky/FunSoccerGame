@@ -469,10 +469,10 @@ h1 em {
   padding: 17px 18px;
   border-bottom: 1px solid var(--line);
 }
-.leaders .team-title {
+.team-blue .team-title {
   background: linear-gradient(110deg, #3971a421, transparent);
 }
-.workers .team-title {
+.team-orange .team-title {
   background: linear-gradient(110deg, #c4783a20, transparent);
 }
 .team-emblem {
@@ -483,11 +483,11 @@ h1 em {
   display: grid;
   place-items: center;
 }
-.leaders .team-emblem {
+.team-blue .team-emblem {
   color: var(--blue);
   background: #4e9ee61a;
 }
-.workers .team-emblem {
+.team-orange .team-emblem {
   color: var(--orange);
   background: #ee975d1a;
 }
@@ -501,10 +501,10 @@ h1 em {
   letter-spacing: 0.7px;
   margin-top: 2px;
 }
-.leaders .team-title h2 {
+.team-blue .team-title h2 {
   color: var(--blue);
 }
-.workers .team-title h2 {
+.team-orange .team-title h2 {
   color: var(--orange);
 }
 .capacity {
@@ -540,7 +540,7 @@ h1 em {
   place-items: center;
   font-size: 9px;
 }
-.workers .avatar {
+.team-orange .avatar {
   color: var(--orange);
   background: #bd78432b;
 }
@@ -913,17 +913,17 @@ input::placeholder {
   font-size: 10px;
   color: #7d9078;
 }
-.team-option.leaders {
+.team-option.team-blue {
   color: var(--blue);
 }
-.team-option.workers {
+.team-option.team-orange {
   color: var(--orange);
 }
-.team-option.leaders.selected {
+.team-option.team-blue.selected {
   background: #4373a329;
   border-color: var(--blue);
 }
-.team-option.workers.selected {
+.team-option.team-orange.selected {
   background: #ac764626;
   border-color: var(--orange);
 }
@@ -1070,10 +1070,10 @@ input::placeholder {
   background: #72b2f015;
   border-radius: 4px;
 }
-.you-chip.leaders {
+.you-chip.team-blue {
   color: var(--blue);
 }
-.you-chip.workers {
+.you-chip.team-orange {
   color: var(--orange);
 }
 .mobile-controls,
@@ -2203,10 +2203,10 @@ body {
   border-color: #b0d5dd16;
   box-shadow: 0 6px 20px #07141d20;
 }
-.leaders .team-title {
+.team-blue .team-title {
   background: linear-gradient(110deg, #287cc43b, transparent);
 }
-.workers .team-title {
+.team-orange .team-title {
   background: linear-gradient(110deg, #d67e3e30, transparent);
 }
 .team-emblem {
@@ -2223,12 +2223,12 @@ body {
 .team-option {
   background: linear-gradient(140deg, #152a35, #14232c);
 }
-.team-option.leaders.selected {
+.team-option.team-blue.selected {
   box-shadow:
     0 0 0 1px #75c8ff44,
     inset 0 0 30px #3092df18;
 }
-.team-option.workers.selected {
+.team-option.team-orange.selected {
   box-shadow:
     0 0 0 1px #ffbd7844,
     inset 0 0 30px #f1933518;
@@ -2455,591 +2455,7 @@ body {
   transform: scale(1.025);
   transition: transform 0.2s;
 }
-/* The Reorg is a synchronized event break, with both new rosters on one screen. */
-.arena-overlay.reorg {
-  background: linear-gradient(120deg, #08243af5, #112432f5 50%, #3b291df5);
-  backdrop-filter: blur(7px);
-  padding: 25px;
-  gap: 0;
-  overflow: hidden;
-}
-.reorg-intro {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-}
-.reorg-intro > .eyebrow {
-  color: #d5e4cc;
-  letter-spacing: 3px;
-}
-.reorg-symbol {
-  font-size: 65px;
-  line-height: 1;
-  color: #dfff9b;
-  text-shadow:
-    -14px 0 30px #46baff88,
-    14px 0 30px #ffad6588;
-}
-.reorg-intro > strong {
-  font:
-    900 italic 115px/0.95 "Barlow Condensed",
-    sans-serif;
-  color: #ecffc3;
-  letter-spacing: 3px;
-  text-shadow:
-    0 6px 0 #243c48,
-    0 12px 40px #0008;
-  animation: goal-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
-}
-.reorg-intro > p {
-  font-size: 17px;
-  color: #d9e9df;
-}
-.reorg-board {
-  width: min(92%, 1050px);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(18px);
-  transition:
-    opacity 0.3s,
-    transform 0.3s;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.reorg-revealed .reorg-intro {
-  display: none;
-}
-.reorg-revealed .reorg-board {
-  opacity: 1;
-  visibility: visible;
-  transform: none;
-}
-.reorg-heading .eyebrow {
-  color: #e2ffa8;
-  letter-spacing: 3px;
-  font-size: 10px;
-}
-.reorg-heading h2 {
-  font-size: 52px;
-  letter-spacing: 1px;
-  line-height: 1.05;
-  margin: 9px 0 7px;
-}
-.reorg-heading p {
-  color: #afc4c7;
-  font-size: 13px;
-}
-.reorg-teams {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  text-align: left;
-}
-.reorg-team {
-  background: #0c2033d9;
-  border: 1px solid #77bded44;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 12px 35px #020e1955;
-}
-.reorg-team.workers {
-  border-color: #eeb67d55;
-}
-.reorg-team h3 {
-  background: linear-gradient(120deg, #2386d34d, #183346);
-  color: #94ddff;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  padding: 14px 18px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid #9dcfee25;
-  margin: 0;
-}
-.reorg-team.workers h3 {
-  color: #ffcb99;
-  background: linear-gradient(120deg, #bd702a55, #35302d);
-}
-.reorg-team h3 > span {
-  font-family: Arial, sans-serif;
-}
-.reorg-team h3 > small {
-  margin-left: auto;
-  font:
-    600 8px "DM Sans",
-    sans-serif;
-  letter-spacing: 1px;
-  color: #bdcfd1;
-}
-.reorg-team ul {
-  list-style: none;
-  padding: 6px 16px;
-  margin: 0;
-}
-.reorg-team li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  border-bottom: 1px solid #c8dbe70e;
-  color: #e8f7f6;
-}
-.reorg-team li:last-child {
-  border-bottom: 0;
-}
-.reorg-team li > strong {
-  font-size: 15px;
-  letter-spacing: 0.2px;
-}
-.reorg-team li > small {
-  margin-left: auto;
-  font-size: 7px;
-  letter-spacing: 0.5px;
-  color: #96b4c4;
-  white-space: nowrap;
-}
-.reorg-team li > i {
-  font-style: normal;
-  font-size: 19px;
-  color: #e0ffab;
-}
-.reorg-avatar {
-  background: #4ea8eb25;
-  color: #a4e0ff;
-  border: 1px solid #7dc9ff33;
-  border-radius: 6px;
-  width: 27px;
-  height: 27px;
-  display: grid;
-  place-items: center;
-  font:
-    700 9px "DM Sans",
-    sans-serif;
-  flex-shrink: 0;
-}
-.workers .reorg-avatar {
-  background: #ffc1801b;
-  color: #ffcf9b;
-  border-color: #ffc18133;
-}
-.reorg-team .is-you {
-  background: #dcff9b13;
-  border-radius: 5px;
-  margin: 2px -6px;
-  padding: 0 6px;
-  outline: 1px solid #ddff9b88;
-}
-.reorg-team .is-you > small {
-  color: #dcff9b;
-  font-weight: 800;
-}
-.reorg-glove {
-  font-size: 12px;
-}
-.reorg-local {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 13px;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 1.3px;
-  color: #adc6d0;
-  padding: 10px;
-  border-radius: 7px;
-  background: #76c8ff14;
-  border: 1px solid #76c8ff44;
-  align-self: center;
-}
-.reorg-local > strong {
-  font-size: 15px;
-  color: #9fddff;
-}
-.reorg-local.workers {
-  border-color: #ffbf7744;
-  background: #ffbf7714;
-}
-.reorg-local.workers > strong {
-  color: #ffca93;
-}
-.reorg-resume {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-  color: #9fb7c2;
-  font-size: 10px;
-  letter-spacing: 1px;
-}
-.reorg-resume > span:first-child {
-  font-size: 8px;
-  color: #c5d7cc;
-}
-.reorg-resume b {
-  color: #e0ff9d;
-  font-size: 20px;
-  margin: 0 3px;
-}
-.reorg-empty {
-  font-size: 11px;
-  color: #93a8b6;
-}
-.game-main:has(.arena-overlay.reorg) .mobile-controls,
-.game-main:has(.arena-overlay.reorg) .mobile-identity,
-.game-main:has(.arena-overlay.reorg) .possession-hint,
-.game-main:has(.arena-overlay.reorg) .rotate {
-  display: none;
-}
-.arena-wrap:has(.arena-overlay.reorg) .pitch-label,
-.arena-wrap:has(.arena-overlay.reorg) .pitch-watermark {
-  opacity: 0;
-}
-@media (max-width: 1100px) {
-  .reorg-board {
-    width: 96%;
-    gap: 13px;
-  }
-  .reorg-heading h2 {
-    font-size: 40px;
-  }
-  .reorg-team h3 {
-    font-size: 25px;
-    padding: 10px 14px;
-  }
-  .reorg-team li {
-    min-height: 34px;
-  }
-  .reorg-team li > strong {
-    font-size: 13px;
-  }
-  .reorg-team li > small {
-    font-size: 6px;
-  }
-  .reorg-avatar {
-    width: 24px;
-    height: 24px;
-    font-size: 8px;
-  }
-  .reorg-team ul {
-    padding: 4px 12px;
-  }
-}
-@media (max-width: 760px) {
-  .arena-overlay.reorg {
-    padding: 14px;
-  }
-  .reorg-board {
-    width: 100%;
-    gap: 10px;
-  }
-  .reorg-heading h2 {
-    font-size: 31px;
-    margin: 5px 0;
-  }
-  .reorg-heading .eyebrow {
-    font-size: 7px;
-    letter-spacing: 2px;
-  }
-  .reorg-heading p {
-    font-size: 9px;
-  }
-  .reorg-teams {
-    gap: 10px;
-  }
-  .reorg-team h3 {
-    font-size: 23px;
-    padding: 8px 10px;
-    gap: 7px;
-  }
-  .reorg-team h3 > small {
-    font-size: 5px;
-    letter-spacing: 0.3px;
-  }
-  .reorg-team ul {
-    padding: 3px 8px;
-  }
-  .reorg-team li {
-    min-height: 28px;
-    gap: 6px;
-  }
-  .reorg-team li > strong {
-    font-size: 11px;
-  }
-  .reorg-team li > small {
-    font-size: 5px;
-    letter-spacing: 0;
-  }
-  .reorg-team li > i {
-    font-size: 13px;
-  }
-  .reorg-avatar {
-    height: 20px;
-    width: 20px;
-    font-size: 7px;
-  }
-  .reorg-resume {
-    font-size: 7px;
-    letter-spacing: 0.4px;
-  }
-  .reorg-resume > span:first-child {
-    font-size: 6px;
-  }
-  .reorg-resume b {
-    font-size: 17px;
-  }
-  .reorg-intro > strong {
-    font-size: 84px;
-  }
-  .reorg-intro > .eyebrow {
-    font-size: 7px;
-    letter-spacing: 2px;
-  }
-  .reorg-intro > p {
-    font-size: 12px;
-  }
-  .reorg-local {
-    font-size: 7px;
-    padding: 7px;
-  }
-  .reorg-local > strong {
-    font-size: 12px;
-  }
-}
-@media (pointer: coarse) and (orientation: landscape) {
-  .game-main .arena-overlay.reorg {
-    padding: 54px 16px 10px;
-    justify-content: center;
-  }
-  .game-main .reorg-board {
-    gap: 7px;
-    width: min(98%, 800px);
-  }
-  .game-main .reorg-heading .eyebrow {
-    font-size: 6px;
-    letter-spacing: 1px;
-  }
-  .game-main .reorg-heading h2 {
-    font-size: 27px;
-    margin: 2px 0;
-  }
-  .game-main .reorg-heading p {
-    display: none;
-  }
-  .game-main .reorg-local {
-    font-size: 6px;
-    padding: 5px 10px;
-    gap: 8px;
-  }
-  .game-main .reorg-local > strong {
-    font-size: 11px;
-  }
-  .game-main .reorg-teams {
-    gap: 10px;
-  }
-  .game-main .reorg-team h3 {
-    font-size: 23px;
-    padding: 5px 10px;
-  }
-  .game-main .reorg-team h3 > small {
-    font-size: 6px;
-  }
-  .game-main .reorg-team ul {
-    padding: 2px 9px;
-  }
-  .game-main .reorg-team li {
-    min-height: 24px;
-    gap: 6px;
-  }
-  .game-main .reorg-team li > strong {
-    font-size: 11px;
-  }
-  .game-main .reorg-team li > small {
-    font-size: 5px;
-    letter-spacing: 0;
-  }
-  .game-main .reorg-avatar {
-    width: 18px;
-    height: 18px;
-    font-size: 6px;
-  }
-  .game-main .reorg-team li > i {
-    font-size: 12px;
-  }
-  .game-main .reorg-resume {
-    font-size: 7px;
-    letter-spacing: 0.4px;
-  }
-  .game-main .reorg-resume > span:first-child {
-    font-size: 6px;
-  }
-  .game-main .reorg-resume b {
-    font-size: 15px;
-  }
-}
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 380px) {
-  .game-main .reorg-heading h2 {
-    font-size: 24px;
-  }
-  .game-main .reorg-team li {
-    min-height: 20px;
-  }
-  .game-main .reorg-board {
-    gap: 6px;
-  }
-  .game-main .reorg-team h3 {
-    font-size: 21px;
-    padding: 4px 9px;
-  }
-  .game-main .reorg-local {
-    padding: 4px 9px;
-  }
-  .game-main .reorg-avatar {
-    height: 17px;
-    width: 17px;
-  }
-  .game-main .reorg-team li > strong {
-    font-size: 10px;
-  }
-}
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 330px) {
-  .game-main .arena-overlay.reorg {
-    padding-top: 47px;
-    padding-bottom: 5px;
-  }
-  .game-main .reorg-heading .eyebrow {
-    display: none;
-  }
-  .game-main .reorg-board {
-    gap: 5px;
-  }
-  .game-main .reorg-heading h2 {
-    font-size: 22px;
-  }
-  .game-main .reorg-team li {
-    min-height: 18px;
-  }
-  .game-main .reorg-resume {
-    font-size: 6px;
-  }
-  .game-main .reorg-resume b {
-    font-size: 13px;
-  }
-}
-@media (pointer: coarse) and (orientation: portrait) {
-  .game-main .reorg-team li {
-    display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) 14px;
-    column-gap: 6px;
-    row-gap: 1px;
-    min-height: 36px;
-    padding: 4px 0;
-  }
-  .game-main .reorg-avatar {
-    grid-column: 1;
-    grid-row: 1/3;
-  }
-  .game-main .reorg-team li > strong {
-    grid-column: 2;
-    grid-row: 1;
-    min-width: 0;
-    white-space: nowrap;
-    font-size: 11px;
-  }
-  .game-main .reorg-team li > small {
-    grid-column: 2;
-    grid-row: 2;
-    margin-left: 0;
-    font-size: 6px;
-  }
-  .game-main .reorg-team li > i {
-    grid-column: 3;
-    grid-row: 1/3;
-  }
-  .game-main .reorg-team h3 {
-    font-size: 23px;
-  }
-  .game-main .reorg-heading h2 {
-    font-size: 31px;
-  }
-}
 /* Use the whole phone for the reveal, then restore the gameplay camera viewport. */
-@media (pointer: coarse) {
-  .game-main .player-game:has(.arena-overlay.reorg) .arena-wrap {
-    width: 100%;
-    height: 100%;
-    aspect-ratio: auto;
-  }
-}
-@media (pointer: coarse) and (orientation: landscape) {
-  .game-main .reorg-team li > strong {
-    font-size: 14px;
-  }
-  .game-main .reorg-team li > small {
-    font-size: 7px;
-  }
-  .game-main .reorg-team li {
-    gap: 8px;
-  }
-  .game-main .reorg-team h3 > small {
-    font-size: 7px;
-  }
-}
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 380px) {
-  .game-main .reorg-team li > strong {
-    font-size: 13px;
-  }
-  .game-main .reorg-team li > small {
-    font-size: 7px;
-  }
-}
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 330px) {
-  .game-main .arena-overlay.reorg {
-    padding-top: 56px;
-  }
-  .game-main .reorg-team li > strong {
-    font-size: 12px;
-  }
-  .game-main .reorg-team li > small {
-    font-size: 6px;
-  }
-}
-@media (pointer: coarse) and (orientation: portrait) {
-  .game-main .reorg-team h3 {
-    display: grid;
-    grid-template-columns: 22px minmax(0, 1fr);
-    column-gap: 6px;
-    row-gap: 3px;
-    font-family: "Barlow Condensed", sans-serif;
-    font-size: 25px;
-    line-height: 1;
-    padding: 10px;
-  }
-  .game-main .reorg-team h3 > span {
-    grid-column: 1;
-    grid-row: 1/3;
-    align-self: center;
-  }
-  .game-main .reorg-team h3 > small {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: start;
-    margin-left: 0;
-    font-size: 8px;
-    line-height: 1.1;
-    letter-spacing: 0.5px;
-  }
-  .game-main .reorg-team li > strong {
-    font-size: 12px;
-  }
-}
 
 /* Player fullscreen keeps controls in the viewport, including notched phones. */
 .player-game {
@@ -3345,7 +2761,7 @@ body {
   gap: 6px;
   touch-action: manipulation;
 }
-.prediction-option.workers {
+.prediction-option.team-orange {
   color: #ffc698;
   background: linear-gradient(145deg, #533c30, #302a29);
   border-color: #f7aa7044;

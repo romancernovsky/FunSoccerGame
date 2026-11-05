@@ -1,13 +1,13 @@
 export const DEFAULT_MATCH_DURATION_SECONDS = 180;
 
-export type Team = "LEADERS" | "WORKERS";
+export type Team = "BLUE" | "ORANGE";
 export type Phase =
   | "WAITING"
   | "COUNTDOWN"
+  | "RULES_COUNTDOWN"
   | "PLAYING"
   | "PAUSED"
   | "GOAL"
-  | "REORG"
   | "KICKOFF_COUNTDOWN"
   | "GOLDEN_GOAL"
   | "FINISHED";
@@ -31,6 +31,13 @@ export type Player = {
   inputAt: number;
 };
 export type Ball = {
+  id: string;
+  height: number;
+  vz: number;
+  scored: boolean;
+  possessionTeam: Team | null;
+  passes: number;
+  passFrom: string | null;
   x: number;
   y: number;
   vx: number;
@@ -41,25 +48,12 @@ export type Ball = {
   heldAt: number;
 };
 export type Celebration = {
+  at: number;
   team: Team;
   scorer: string;
   passes: number;
   id: number;
 };
-export type ReorgAssignment = {
-  id: string;
-  name: string;
-  fromTeam: Team;
-  team: Team;
-  keeper: boolean;
-};
-export type Reorg = { id: number; assignments: ReorgAssignment[] };
-export const REORG = {
-  remaining: 60,
-  revealSeconds: 12,
-  introSeconds: 2,
-  kickoffSeconds: 3,
-} as const;
 export type PredictionSummary = {
   roundId: string;
   open: boolean;
@@ -86,8 +80,9 @@ export type Snapshot = {
   score: Record<Team, number>;
   players: Player[];
   ball: Ball;
+  balls: Ball[];
+  multiball: boolean;
   celebration: Celebration | null;
-  reorg: Reorg | null;
   golden: boolean;
   ended: boolean;
   predictions: PredictionSummary;
@@ -105,4 +100,13 @@ export const FIELD = {
   ballRadius: 9,
   centerCircleRadius: 100,
 };
-export const TEAMS: Team[] = ["LEADERS", "WORKERS"];
+export const TEAMS: Team[] = ["BLUE", "ORANGE"];
+
+export const TEAM_NAMES: Record<Team, string> = {
+  BLUE: "Blue Team",
+  ORANGE: "Orange Team",
+};
+export const teamName = (team: Team) => TEAM_NAMES[team];
+export const teamClass = (team: Team) => `team-${team.toLowerCase()}`;
+
+export const MULTIBALL_COUNTDOWN_SECONDS = 7;

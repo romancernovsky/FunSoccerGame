@@ -13,9 +13,9 @@ function circle(g: Game) {
       ) < 0.000001,
     );
     assert.ok(
-      p.team === "LEADERS" ? p.x < FIELD.width / 2 : p.x > FIELD.width / 2,
+      p.team === "BLUE" ? p.x < FIELD.width / 2 : p.x > FIELD.width / 2,
     );
-    assert.equal(p.fx, p.team === "LEADERS" ? 1 : -1);
+    assert.equal(p.fx, p.team === "BLUE" ? 1 : -1);
   }
   for (let i = 0; i < field.length; i++)
     for (let j = i + 1; j < field.length; j++)
@@ -27,8 +27,8 @@ for (const size of [1, 3, 6]) {
   test(`${size} vs ${size} starts on the circle edge with no overlapping players`, () => {
     const g = new Game();
     for (let i = 0; i < size; i++) {
-      g.join(`Leader ${i}`, "LEADERS", 1000);
-      g.join(`Worker ${i}`, "WORKERS", 1000);
+      g.join(`Leader ${i}`, "BLUE", 1000);
+      g.join(`Worker ${i}`, "ORANGE", 1000);
     }
     g.command("start", { confirm: true }, 1000);
     circle(g);
@@ -41,15 +41,16 @@ for (const size of [1, 3, 6]) {
 }
 test("keepers stay in goal and kickoff after goals and rematches restores the circle", () => {
   const g = new Game();
-  const a = g.join("Alex", "LEADERS", 1000);
-  const b = g.join("Sam", "WORKERS", 1000);
-  g.join("Lee", "LEADERS", 1000);
+  const a = g.join("Alex", "BLUE", 1000);
+  const b = g.join("Sam", "ORANGE", 1000);
+  g.join("Lee", "BLUE", 1000);
   g.command("keeper", { id: a.id }, 1000);
   g.command("start", { confirm: true }, 1000);
   circle(g);
   assert.deepEqual([g.players.get(a.id)!.x, g.players.get(a.id)!.y], [70, 350]);
+  g.tick(0, 5000);
   g.players.get(b.id)!.x = 1000;
-  g.goal("LEADERS", 5100);
+  g.goal("BLUE", 5100);
   g.tick(0, 8100);
   assert.equal(g.phase, "KICKOFF_COUNTDOWN");
   circle(g);

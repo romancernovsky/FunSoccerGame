@@ -88,12 +88,12 @@ test("minimal Play/Bet pages fit phones; joining and host streaming stay focused
           await expect(page.locator("form button")).toHaveCount(3);
           await readable(page.locator("#name"), 18);
           await readable(page.locator(".team-option small").first(), 14);
-          await page.locator('[data-team="WORKERS"]').click();
-          await expect(page.locator('[data-team="WORKERS"]')).toHaveAttribute(
+          await page.locator('[data-team="ORANGE"]').click();
+          await expect(page.locator('[data-team="ORANGE"]')).toHaveAttribute(
             "aria-pressed",
             "true",
           );
-          await expect(page.locator('[data-team="LEADERS"]')).toHaveAttribute(
+          await expect(page.locator('[data-team="BLUE"]')).toHaveAttribute(
             "aria-pressed",
             "false",
           );
