@@ -113,7 +113,10 @@ function connect() {
         if (
           state &&
           state.phase !== msg.data.phase &&
-          !["PLAYING", "GOLDEN_GOAL"].includes(msg.data.phase)
+          (!["PLAYING", "GOLDEN_GOAL"].includes(msg.data.phase) ||
+            ["COUNTDOWN", "RULES_COUNTDOWN", "KICKOFF_COUNTDOWN"].includes(
+              state.phase,
+            ))
         )
           stopInput();
         state = msg.data;
@@ -613,6 +616,8 @@ function bind() {
   }
 }
 function setAction(value: boolean) {
+  if (value && (!state || !["PLAYING", "GOLDEN_GOAL"].includes(state.phase)))
+    return;
   if (value && !input.action) chargeStarted = performance.now();
   charging = value;
   input.action = value;
@@ -650,6 +655,8 @@ window.addEventListener("keydown", (e) => {
     ].includes(e.key)
   ) {
     e.preventDefault();
+    // A key held through a pause/countdown must be released before it can move again.
+    if (e.repeat && !keys.has(e.key.toLowerCase())) return;
     keys.add(e.key.toLowerCase());
     if (e.key === " " && !e.repeat) setAction(true);
     if (e.key === "Shift" && !e.repeat) {
@@ -673,6 +680,11 @@ document.addEventListener("visibilitychange", () => {
 });
 setInterval(() => {
   if (!identity || !join) return;
+  if (!state || !["PLAYING", "GOLDEN_GOAL"].includes(state.phase)) {
+    Object.assign(input, { x: 0, y: 0, action: false, dash: false });
+    send("input", input);
+    return;
+  }
   input.x = Math.max(
     -1,
     Math.min(

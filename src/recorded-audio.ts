@@ -63,8 +63,8 @@ export const EFFECTS: Record<string, Part[]> = {
   match_resumed: [{ clip: "whistle", gain: 0.55, duration: 0.35 }],
   goal_scored: [
     { clip: "net", gain: 0.5 },
-    { clip: "cheer", gain: 0.65, delay: 0.04, duration: 2.7 },
-    { clip: "applause", gain: 0.6, delay: 0.15, duration: 2.6 },
+    { clip: "cheer", gain: 0.95, delay: 0.04, duration: 2.7 },
+    { clip: "applause", gain: 0.75, delay: 0.15, duration: 2.6 },
   ],
   team_goal: [
     { clip: "applause", gain: 0.28, delay: 0.8, duration: 1.7 },

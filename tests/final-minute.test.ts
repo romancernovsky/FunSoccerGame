@@ -445,3 +445,46 @@ test("twelve simulated players complete repeated three-ball rounds without inval
   assert.equal(g.phase, "FINISHED");
   assert.equal(g.players.size, 12);
 });
+
+test("the new-rules countdown ends with a fresh centred kickoff and neutral movement, charge and dash", () => {
+  const { g, identities } = match(6, 6);
+  const p = g.players.get(identities[0].id)!;
+  Object.assign(p, {
+    x: 800,
+    y: 500,
+    fx: -1,
+    fy: 0,
+    chargeAt: now + 4500,
+    dashUntil: now + 15000,
+  });
+  Object.assign(g.ball, {
+    x: 771,
+    y: 500,
+    owner: p.id,
+    lastTouch: p.id,
+    possessionTeam: p.team,
+    passes: 3,
+  });
+  surprise(g);
+  const countdownBall = g.ball.id;
+  g.input(p.id, { x: 1, y: 0, action: true, dash: true }, g.deadline - 1);
+  g.tick(0, g.deadline);
+  assert.equal(g.phase, "PLAYING");
+  assert.equal(g.remaining, 60);
+  circle(g);
+  assert.equal(g.balls.length, 3);
+  assert.notEqual(g.ball.id, countdownBall);
+  assert.deepEqual([g.ball.x, g.ball.y], [600, 350]);
+  assert.ok(g.balls.every((b) => !b.owner && !b.lastTouch && b.passes === 0));
+  assert.ok(
+    [...g.players.values()].every(
+      (p) =>
+        !p.input.x &&
+        !p.input.y &&
+        !p.input.action &&
+        !p.input.dash &&
+        !p.chargeAt &&
+        !p.dashUntil,
+    ),
+  );
+});

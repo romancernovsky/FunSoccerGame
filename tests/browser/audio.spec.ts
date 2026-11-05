@@ -41,6 +41,7 @@ async function probe(page: Page) {
     window.AudioContext = class extends Native {
       peak = 0;
       starts = 0;
+      startedBuffers: (AudioBuffer | null)[] = [];
       master: GainNode | null = null;
       constructor() {
         super();
@@ -60,6 +61,7 @@ async function probe(page: Page) {
           ...args: Parameters<AudioBufferSourceNode["start"]>
         ) => {
           this.starts++;
+          this.startedBuffers.push(source.buffer);
           start(...args);
         };
         return source;
@@ -527,7 +529,7 @@ test("recorded cues preserve action batches, skip stale history and sound every 
         Math.max(last.event.id, ...(last.events ?? []).map((e) => e.id)) + 1;
       engine.observe({
         ...last,
-        now: last.now + 2000,
+        now: last.now + 5001,
         event: { id: freshId, kind: "goal_scored" },
         events: [{ id: freshId, kind: "goal_scored", at: last.now }],
       });
@@ -579,5 +581,212 @@ test("recorded cues preserve action batches, skip stale history and sound every 
   expect(result.staleCount).toBe(0);
   expect(result.ticks).toBe(10);
   await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+  await page.evaluate(() => (window as any).__engine.mute());
+});
+
+async function fixtureAudio(page: Page, initial: Snapshot) {
+  await probe(page);
+  await page.goto("/bet");
+  await page.evaluate(async (initial) => {
+    const path = "/src/audio.ts";
+    const { MatchAudio } = await import(path);
+    const engine = new MatchAudio(() => {});
+    (window as any).__engine = engine;
+    engine.observe(initial);
+    const button = document.createElement("button");
+    button.id = "fixture-enable";
+    button.textContent = "Enable audio";
+    button.onclick = () => engine.toggle();
+    document.body.append(button);
+  }, initial);
+  await page.locator("#fixture-enable").click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__engine.ready))
+    .toBe(true);
+  await startMeter(page);
+  await page.waitForTimeout(650);
+}
+function goalFixture() {
+  const game = new Game();
+  game.join("Alex", "BLUE", 1000);
+  game.join("Sam", "ORANGE", 1000);
+  game.command("start", { confirm: true }, 1000);
+  game.tick(0, 5000);
+  const before = structuredClone(game.snapshot(5100));
+  game.goal("BLUE", 5200);
+  return { game, before, goal: structuredClone(game.snapshot(5200)) };
+}
+test("goal cheering cannot be dropped when gameplay fills the audio voice limit", async ({
+  page,
+}) => {
+  const { before, goal } = goalFixture();
+  await fixtureAudio(page, before);
+  const result = await page.evaluate((goal) => {
+    const engine = (window as any).__engine,
+      context = (window as any).__contexts.at(-1);
+    engine.stopVoices();
+    for (let i = 0; i < 60; i++) engine.play("shot");
+    const busy = engine.voices.size;
+    const before = context.startedBuffers.filter(
+      (b: AudioBuffer) => b === engine.bank.cheer,
+    ).length;
+    engine.observe(goal);
+    const cheers =
+      context.startedBuffers.filter((b: AudioBuffer) => b === engine.bank.cheer)
+        .length - before;
+    engine.observe(goal);
+    const repeat =
+      context.startedBuffers.filter((b: AudioBuffer) => b === engine.bank.cheer)
+        .length - before;
+    return { busy, cheers, repeat, ready: engine.ready };
+  }, goal);
+  expect(result.busy).toBeGreaterThan(20);
+  expect(result.ready).toBe(true);
+  expect(result.cheers).toBe(1);
+  expect(result.repeat).toBe(1);
+  await page.evaluate(() => (window as any).__engine.mute());
+});
+test("a goal delayed past 1.5 seconds still cheers during the celebration without replaying on a new screen", async ({
+  page,
+}) => {
+  const { game, before } = goalFixture();
+  const delayed = structuredClone(game.snapshot(7000));
+  await fixtureAudio(page, before);
+  const result = await page.evaluate(
+    async ({ delayed }) => {
+      const engine = (window as any).__engine,
+        context = (window as any).__contexts.at(-1);
+      engine.stopVoices();
+      const start = context.startedBuffers.filter(
+        (b: AudioBuffer) => b === engine.bank.cheer,
+      ).length;
+      engine.observe(delayed);
+      engine.observe(delayed);
+      const cheers =
+        context.startedBuffers.filter(
+          (b: AudioBuffer) => b === engine.bank.cheer,
+        ).length - start;
+      const path = "/src/audio.ts";
+      const { MatchAudio } = await import(path);
+      const refreshed = new MatchAudio(() => {});
+      let replays = 0;
+      refreshed.play = () => replays++;
+      refreshed.observe(delayed);
+      return { cheers, replays };
+    },
+    { delayed },
+  );
+  expect(result.cheers).toBe(1);
+  expect(result.replays).toBe(0);
+  await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+  await page.evaluate(() => (window as any).__engine.mute());
+});
+
+test("every sound produces real browser audio through the unlocked match mixer", async ({
+  page,
+}) => {
+  await fixtureAudio(page, structuredClone(new Game().snapshot(1000)));
+  const kinds: string[] = await page.evaluate(async () => {
+    const path = "/src/recorded-audio.ts";
+    return Object.keys((await import(path)).EFFECTS);
+  });
+  const levels: Record<string, number> = {};
+  for (const kind of kinds) {
+    const scheduled = await page.evaluate(async (kind) => {
+      const engine = (window as any).__engine,
+        context = (window as any).__contexts.at(-1);
+      engine.stopVoices();
+      context.peak = 0;
+      context.measureFrom = context.currentTime;
+      const before = context.startedBuffers.length;
+      engine.play(kind);
+      const path = "/src/recorded-audio.ts";
+      const { EFFECTS } = await import(path);
+      return {
+        count: context.startedBuffers.length - before,
+        expected: EFFECTS[kind].length,
+      };
+    }, kind);
+    expect(scheduled.count, kind).toBe(scheduled.expected);
+    await expect
+      .poll(() => peak(page), { message: kind, timeout: 4000 })
+      .toBeGreaterThan(0.005);
+    levels[kind] = await peak(page);
+  }
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir("artifacts/audio", { recursive: true });
+  await writeFile(
+    "artifacts/audio/validated-cues.json",
+    JSON.stringify(levels, null, 2),
+  );
+  await page.evaluate(() => (window as any).__engine.mute());
+});
+test("a goal from a live twelve-player match starts the recorded cheer on the host", async ({
+  page,
+}) => {
+  const host = await hostControl();
+  await probe(page);
+  try {
+    host.command("bots");
+    await expect.poll(() => host.state().players.length).toBe(12);
+    await page.goto("/host");
+    await page.locator('[data-command="start"]').click();
+    await expect(page.locator(".audio-panel")).toHaveAttribute(
+      "data-status",
+      "on",
+    );
+    await startMeter(page);
+    await expect
+      .poll(() => host.state().score.BLUE + host.state().score.ORANGE, {
+        timeout: 45000,
+      })
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as any).__contexts
+              .at(-1)
+              .startedBuffers.filter(
+                (b: AudioBuffer) => b && b.duration > 5 && b.duration < 7,
+              ).length,
+        ),
+      )
+      .toBeGreaterThan(0);
+    await expect.poll(() => peak(page)).toBeGreaterThan(0.005);
+  } finally {
+    if (!["WAITING", "FINISHED"].includes(host.state().phase))
+      host.command("end");
+    host.close();
+  }
+});
+
+test("an open host hears new goals after a backend restart resets event numbers", async ({
+  page,
+}) => {
+  const old = goalFixture();
+  for (let i = 0; i < 90; i++) old.game.emit("pass");
+  await fixtureAudio(page, structuredClone(old.game.snapshot(5200)));
+  const fresh = goalFixture();
+  const result = await page.evaluate(
+    ({ before, goal }) => {
+      const engine = (window as any).__engine,
+        context = (window as any).__contexts.at(-1);
+      engine.stopVoices();
+      const start = context.startedBuffers.filter(
+        (b: AudioBuffer) => b === engine.bank.cheer,
+      ).length;
+      engine.observe(before);
+      engine.observe(goal);
+      engine.observe(goal);
+      return (
+        context.startedBuffers.filter(
+          (b: AudioBuffer) => b === engine.bank.cheer,
+        ).length - start
+      );
+    },
+    { before: fresh.before, goal: fresh.goal },
+  );
+  expect(result).toBe(1);
   await page.evaluate(() => (window as any).__engine.mute());
 });

@@ -64,7 +64,9 @@
   font-size: clamp(11px, 1.1vw, 14px);
   letter-spacing: 0;
 }
-body:has(.arena-overlay.rules_countdown) .mobile-controls {
+body:has(.arena-overlay.rules_countdown) .mobile-controls,
+body:has(.arena-overlay.countdown) .mobile-controls,
+body:has(.arena-overlay.kickoff_countdown) .mobile-controls {
   visibility: hidden;
   pointer-events: none;
 }

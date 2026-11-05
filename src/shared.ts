@@ -73,6 +73,7 @@ export type AudienceState = {
 };
 export type GameEvent = { id: number; kind: string; at: number };
 export type Snapshot = {
+  eventStreamId: string;
   now: number;
   phase: Phase;
   deadline: number;

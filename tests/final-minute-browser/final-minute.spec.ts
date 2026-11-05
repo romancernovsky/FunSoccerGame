@@ -82,6 +82,7 @@ test("seven-second new rules event preserves teams, refreshes safely, drops two 
     await host.getByRole("button", { name: /START MATCH/ }).click();
     await host.locator("dialog #confirm").click();
     await expect.poll(() => state?.phase).toBe("PLAYING");
+    await page.keyboard.down("d");
     await expect
       .poll(() => state?.phase, { timeout: 15000 })
       .toBe("RULES_COUNTDOWN");
@@ -135,7 +136,18 @@ test("seven-second new rules event preserves teams, refreshes safely, drops two 
       "data-live-balls",
       "3",
     );
-    const x = state!.players.find((p) => p.id === id)!.x;
+    const local = state!.players.find((p) => p.id === id)!;
+    expect(Math.hypot(local.x - 600, local.y - 350)).toBeCloseTo(
+      FIELD.centerCircleRadius,
+      4,
+    );
+    const x = local.x;
+    // The physical D key is still held across the surprise and page refresh.
+    await page.keyboard.down("d");
+    await page.waitForTimeout(300);
+    expect(state!.players.find((p) => p.id === id)!.x).toBeCloseTo(x, 4);
+    expect(state!.players.find((p) => p.id === id)!.input.x).toBe(0);
+    await page.keyboard.up("d");
     await page.keyboard.down("d");
     await expect
       .poll(() => state!.players.find((p) => p.id === id)!.x)

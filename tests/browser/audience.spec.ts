@@ -236,6 +236,8 @@ test("live bet updates preserve a held player joystick and the host broadcast ca
       "data-renderer",
       "webgl",
     );
+    await expect(phone.locator("#arena-overlay")).toHaveClass(/playing/);
+    await expect(host.locator("#arena-overlay")).toHaveClass(/playing/);
     await phone.evaluate(() => {
       (window as any).__heldStick = document.querySelector("#joystick");
       (window as any).__playerArena = document.querySelector("#arena");
@@ -284,9 +286,11 @@ test("live bet updates preserve a held player joystick and the host broadcast ca
             (window as any).__broadcastArena,
         ),
       ).toBe(true);
-      expect(state!.players.find((p) => p.id === id)!.input.x).toBeGreaterThan(
-        0.25,
-      );
+      // The server may briefly freeze stale inputs during a slow browser frame.
+      // The same held pointer must resume without any new press.
+      await expect
+        .poll(() => state!.players.find((p) => p.id === id)!.input.x)
+        .toBeGreaterThan(0.25);
     }
     await expect(host.locator(".crowd-live")).toContainText("100% ORANGE TEAM");
     await expect(host.locator("#host-bets .crowd-heading > strong")).toHaveText(

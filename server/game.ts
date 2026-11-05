@@ -1,4 +1,5 @@
 import { Predictions } from "./predictions.js";
+import { isImportantSound, soundHistoryMs } from "../src/sound-policy.js";
 import { randomBytes } from "node:crypto";
 import {
   DEFAULT_MATCH_DURATION_SECONDS,
@@ -17,6 +18,7 @@ import {
 const blank = (): Input => ({ x: 0, y: 0, action: false, dash: false });
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export class Game {
+  readonly eventStreamId = randomBytes(8).toString("hex");
   predictions = new Predictions();
   players = new Map<string, Player>();
   sessions = new Map<string, string>();
@@ -61,6 +63,7 @@ export class Game {
   ended = false;
   event = { id: 0, kind: "ready" };
   private events: GameEvent[] = [];
+  private importantEvents: GameEvent[] = [];
   private eventTime = 0;
   resumePhase: Phase = "PLAYING";
   pausedDeadline = 0;
@@ -102,8 +105,9 @@ export class Game {
   }
   private sound(kind: string, at: number) {
     const event = { id: ++this.nextId, kind, at };
-    this.events.push(event);
-    if (this.events.length > 32) this.events.shift();
+    const history = isImportantSound(kind) ? this.importantEvents : this.events;
+    history.push(event);
+    if (history.length > 32) history.shift();
     return event;
   }
   count(team: Team, connected = false) {
@@ -346,6 +350,7 @@ export class Game {
   }
   reset() {
     this.events = [];
+    this.importantEvents = [];
     this.remaining = this.config.duration;
     this.score = { BLUE: 0, ORANGE: 0 };
     this.ball = this.newBall();
@@ -521,6 +526,7 @@ export class Game {
       ["COUNTDOWN", "KICKOFF_COUNTDOWN", "RULES_COUNTDOWN"].includes(this.phase)
     ) {
       if (now >= this.deadline) {
+        this.prepareKickoff();
         this.dropExtraBalls(now);
         this.phase = this.golden ? "GOLDEN_GOAL" : "PLAYING";
         this.emit("go");
@@ -915,6 +921,7 @@ export class Game {
   }
   snapshot(now: number, includeEvents = true): Snapshot {
     return {
+      eventStreamId: this.eventStreamId,
       now,
       phase: this.phase,
       deadline: this.deadline,
@@ -932,7 +939,11 @@ export class Game {
       dev: this.config.dev,
       event: this.event,
       ...(includeEvents
-        ? { events: this.events.filter((event) => now - event.at <= 1500) }
+        ? {
+            events: [...this.events, ...this.importantEvents]
+              .filter((event) => now - event.at <= soundHistoryMs(event.kind))
+              .sort((a, b) => a.id - b.id),
+          }
         : {}),
     };
   }

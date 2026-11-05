@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../server/game";
+import { isImportantSound } from "../src/sound-policy";
 
 function setup() {
   const g = new Game();
@@ -30,8 +31,12 @@ test("simultaneous real dash, charge and pass cues survive in one snapshot", () 
 test("cue history is bounded, expires and is omitted from player snapshots", () => {
   const { g } = setup();
   for (let i = 0; i < 50; i++) g.emit("test");
-  assert.equal(g.snapshot(5000).events!.length, 32);
-  assert.equal(g.snapshot(6501).events!.length, 0);
+  assert.equal(
+    g.snapshot(5000).events!.filter((e) => e.kind === "test").length,
+    32,
+  );
+  assert.ok(g.snapshot(5000).events!.length <= 64);
+  assert.ok(g.snapshot(6501).events!.every((e) => isImportantSound(e.kind)));
   assert.equal(g.snapshot(5000, false).events, undefined);
   g.command("end", { confirm: true }, 6600);
   g.command("new", {}, 6700);
@@ -56,4 +61,33 @@ test("a successful steal emits a tackle cue, kickoff reset does not", () => {
   g.goal("BLUE", 6000);
   g.tick(0, 9000);
   assert.ok(!g.snapshot(9000).events!.some((e) => e.kind === "tackle"));
+});
+
+test("goals and match announcements survive gameplay bursts and a delayed screen, then expire", () => {
+  const { g } = setup();
+  g.goal("BLUE", 5200);
+  for (let i = 0; i < 100; i++) g.emit("pass");
+  const delayed = g.snapshot(7000);
+  assert.ok(delayed.events!.some((e) => e.kind === "goal_scored"));
+  assert.ok(!delayed.events!.some((e) => e.kind === "pass"));
+  assert.equal(
+    new Set(delayed.events!.map((e) => e.id)).size,
+    delayed.events!.length,
+  );
+  assert.deepEqual(
+    delayed.events!.map((e) => e.id),
+    delayed.events!.map((e) => e.id).sort((a, b) => a - b),
+  );
+  assert.ok(!g.snapshot(10201).events!.some((e) => e.kind === "goal_scored"));
+  for (let i = 0; i < 80; i++) g.emit("match_paused");
+  assert.ok(g.snapshot(5200).events!.length <= 64);
+});
+
+test("event stream identity survives match resets and changes with a new backend", () => {
+  const { g } = setup();
+  const stream = g.snapshot(5000).eventStreamId;
+  g.command("end", { confirm: true }, 6000);
+  g.command("new", {}, 6100);
+  assert.equal(g.snapshot(6100).eventStreamId, stream);
+  assert.notEqual(new Game().snapshot(6100).eventStreamId, stream);
 });

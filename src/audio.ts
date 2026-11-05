@@ -1,4 +1,5 @@
 import type { Snapshot } from "./shared";
+import { isImportantSound, soundHistoryMs } from "./sound-policy";
 import {
   EFFECTS,
   preloadRecordings,
@@ -45,8 +46,10 @@ export class MatchAudio {
   private playing = false;
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
+  private gameplay: GainNode | null = null;
+  private focusUntil = 0;
   private ambience: ReturnType<typeof recordedAmbience> | null = null;
-  private voices = new Set<AudioScheduledSourceNode>();
+  private voices = new Map<AudioScheduledSourceNode, string>();
   private bank: SoundBank | null = null;
   private crowdLevel = 0.12;
   private lastPlayed = new Map<string, number>();
@@ -56,6 +59,7 @@ export class MatchAudio {
   private pending = false;
   private attempt = 0;
   private lastEvent: number | null = null;
+  private streamId: string | null = null;
   private countdown = "";
   private previousSessionType: string | undefined;
 
@@ -139,7 +143,10 @@ export class MatchAudio {
           this.master,
           this.bank!,
         );
-      this.ambience?.setLevel(this.playing ? this.crowdLevel : 0);
+      const focused = this.context.currentTime < this.focusUntil;
+      this.ambience?.setLevel(
+        this.playing ? this.crowdLevel * (focused ? 0.25 : 1) : 0,
+      );
     } catch {
       this.publish("blocked");
     }
@@ -189,6 +196,8 @@ export class MatchAudio {
         const context = (this.context = new Constructor());
         this.master = createBroadcastMaster(context);
         this.master.gain.value = this.volume;
+        this.gameplay = context.createGain();
+        this.gameplay.connect(this.master);
 
         context.onstatechange = () => {
           if (this.context !== context || !this.wanted || this.pending) return;
@@ -238,15 +247,32 @@ export class MatchAudio {
     if (ramp && value > 0) gain.setTargetAtTime(value, at, 0.015);
     else gain.setValueAtTime(value, at);
   }
-  private stopVoices() {
-    for (const voice of this.voices) {
+  private stopVoices(incidentalOnly = false) {
+    for (const [voice, kind] of this.voices) {
+      if (incidentalOnly && this.priority(kind)) continue;
       try {
         voice.stop();
       } catch {
         /* Already ended. */
       }
+      this.voices.delete(voice);
     }
-    this.voices.clear();
+  }
+  private priority(kind: string) {
+    return (
+      isImportantSound(kind) ||
+      ["countdown", "last_seconds", "test"].includes(kind)
+    );
+  }
+  private focusGoal() {
+    if (!this.context || !this.gameplay) return;
+    const now = this.context.currentTime;
+    this.focusUntil = now + 2;
+    const gain = this.gameplay.gain;
+    gain.cancelScheduledValues(now);
+    gain.setTargetAtTime(0.2, now, 0.02);
+    gain.setTargetAtTime(1, this.focusUntil, 0.12);
+    this.syncAmbience();
   }
   private releaseContext() {
     this.ambience?.stop();
@@ -254,6 +280,9 @@ export class MatchAudio {
     this.bank = null;
     this.lastPlayed.clear();
     this.stopVoices();
+    this.gameplay?.disconnect();
+    this.gameplay = null;
+    this.focusUntil = 0;
     this.setGain(0);
     const context = this.context;
     this.context = null;
@@ -269,22 +298,36 @@ export class MatchAudio {
       !this.context ||
       !this.master ||
       !this.bank ||
-      !EFFECTS[kind] ||
-      this.voices.size > 48
+      !EFFECTS[kind]
     )
       return;
+    const priority = this.priority(kind);
+    // Incidental sounds cannot take the voices reserved for goals and whistles.
+    if (!priority && this.voices.size >= 32) return;
+    if (priority && this.voices.size >= 32) this.stopVoices(true);
+    while (priority && this.voices.size + EFFECTS[kind].length > 64) {
+      const oldest = this.voices.keys().next().value;
+      if (!oldest) break;
+      try {
+        oldest.stop();
+      } catch {
+        /* Already ended. */
+      }
+      this.voices.delete(oldest);
+    }
     const now = this.context.currentTime * 1000;
     if (now - (this.lastPlayed.get(kind) ?? -Infinity) < (COOLDOWN[kind] ?? 0))
       return;
     this.lastPlayed.set(kind, now);
     try {
+      if (kind === "goal_scored") this.focusGoal();
       playRecordedEffect(
         this.context,
-        this.master,
+        priority ? this.master : (this.gameplay ?? this.master),
         kind,
         this.bank,
         (source, nodes) => {
-          this.voices.add(source);
+          this.voices.set(source, kind);
           source.onended = () => {
             this.voices.delete(source);
             source.disconnect();
@@ -297,6 +340,21 @@ export class MatchAudio {
     }
   }
   observe(state: Snapshot) {
+    if (this.streamId !== state.eventStreamId) {
+      // A restarted backend begins event numbering again; keep the user's audio
+      // preference, but baseline the new stream instead of suppressing its cues.
+      this.stopVoices();
+      this.streamId = state.eventStreamId;
+      this.lastEvent = null;
+      this.phase = this.rhythm = this.countdown = "";
+      this.finalSecond = 0;
+      this.focusUntil = 0;
+      if (this.context && this.gameplay) {
+        const now = this.context.currentTime;
+        this.gameplay.gain.cancelScheduledValues(now);
+        this.gameplay.gain.setValueAtTime(1, now);
+      }
+    }
     const playing = state.phase === "PLAYING" || state.phase === "GOLDEN_GOAL";
     if (
       this.phase !== state.phase &&
@@ -321,7 +379,7 @@ export class MatchAudio {
       for (const event of events) {
         if (
           event.id <= this.lastEvent ||
-          state.now - event.at > 1500 ||
+          state.now - event.at > soundHistoryMs(event.kind) ||
           event.at > state.now
         )
           continue;
