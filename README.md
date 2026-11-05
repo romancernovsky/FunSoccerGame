@@ -126,7 +126,7 @@ Use **Full field / Ball-follow camera** to switch framing. **Broadcast mode** hi
 
 ## Visual presentation and review
 
-Blue Team wears blue with blond hair; Orange Team wears orange with dark hair. Team assignments and goalkeeper roles stay fixed throughout a match. Host team moves in the lobby update the kit and hair. Eye whites, pupils and highlights are grouped with the face and turn with the head.
+Blue Team wears black with white trim and blond hair; Orange Team wears orange with dark hair. Team assignments and goalkeeper roles stay fixed throughout a match. Host team moves in the lobby update the kit and hair. Eye whites, pupils and highlights are grouped with the face and turn with the head.
 
 The arena uses a real Three.js scene with original modeled stadium architecture, instanced seating/crowd, 3D goal nets, and articulated toy-like player models. Depth sorting, collision-aware nameplates, ball trails, team lighting and goal particles keep live play readable. Mobile players have a bright YOU marker, possession ring and action-button accent, shot-charge ring and dash cooldown. Turf is a cached high-resolution texture; crowd geometry is instanced. Hemispheric and directional lighting, soft cached contact shadows, and adaptive pixel resolution keep the scene readable. The renderer warms up in the lobby. The authoritative rules remain on a planar pitch; rendering is real 3D.
 
