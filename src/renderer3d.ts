@@ -515,12 +515,12 @@ export class Arena3D {
           ? ["#f5d77e", "#e9c361", "#ffe3a0", "#e4ba58"]
           : ["#2d2631", "#563a29", "#32272c", "#3d2d25"]
       )[hash % 4],
-      shirtColor = blue ? "#17191d" : "#f58228";
+      shirtColor = blue ? "#168bf5" : "#f58228";
     for (const leg of [left, right]) {
       box(leg, 0, 0.085, 0.025, 0.125, 0.12, 0.21, "#163044", true);
       box(leg, 0, 0.18, 0, 0.095, 0.13, 0.1, "#f0f3d6", true);
     }
-    box(body, 0, 0.28, 0, 0.31, 0.16, 0.23, blue ? "#101216" : "#8d422c", true);
+    box(body, 0, 0.28, 0, 0.31, 0.16, 0.23, blue ? "#173f89" : "#8d422c", true);
     const shirt = box(body, 0, 0.47, 0, 0.37, 0.32, 0.29, shirtColor, true);
     // Front collar, shirt stripe, badge and back number.
     box(
@@ -531,7 +531,7 @@ export class Arena3D {
       0.027,
       0.23,
       0.015,
-      blue ? "#e8edf2" : "#ffde9c",
+      blue ? "#92ddff" : "#ffde9c",
     );
     box(
       body,
@@ -541,7 +541,7 @@ export class Arena3D {
       0.027,
       0.23,
       0.015,
-      blue ? "#e8edf2" : "#ffde9c",
+      blue ? "#92ddff" : "#ffde9c",
     );
     box(body, 0, 0.605, 0.12, 0.13, 0.03, 0.04, "#f2f5d8", true);
     const numberTexture = textTexture(
@@ -829,7 +829,7 @@ export class Arena3D {
     );
     const local = localId ? this.actors.get(localId) : null;
     const label = local
-      ? `Live 3D football arena. Your kit is ${local.team === "BLUE" ? "black" : "orange"} (${teamName(local.team)}).`
+      ? `Live 3D football arena. Your kit is ${local.team === "BLUE" ? "blue" : "orange"} (${teamName(local.team)}).`
       : "Live 3D football arena";
     if (this.renderer.domElement.getAttribute("aria-label") !== label)
       this.renderer.domElement.setAttribute("aria-label", label);
